@@ -1,11 +1,11 @@
 # 📊 SQL-to-Diagram: Modelador de Bases de Datos Relacionales
 
-¡Transforma tu código SQL en diagramas relacionales e interactivos en segundos! Esta es una herramienta web construida en HTML y JavaScript que permite visualizar, ordenar y personalizar tus esquemas de bases de datos de forma local, rápida y sin configuraciones complejas.
+¡Transforma tu código SQL en diagramas interactivos en segundos! Una herramienta web ligera, construida con HTML y JavaScript, diseñada para visualizar, organizar y personalizar tus esquemas de bases de datos de forma **100% local, rápida y sin configuraciones complejas**.
 
 ## ✨ Características Principales
 
-* **🚀 Generación Automática:** Pega tu script de `SQL` (compatible con MySQL y PostgreSQL) y genera el modelo relacional al instante.
-* **🎨 Personalización Visual:** Cambia los colores de las tablas para organizar tu diseño por módulos o áreas lógicas.
-* **🧠 Organización Flexible:** Ordena y arrastra las tablas libremente por el lienzo para mejorar la legibilidad del diagrama.
-* **📥 Importación y Exportación:** * Exporta tus diseños en formatos de alta calidad como **PNG** o **PDF** para incluir en tu documentación.
-
+* **🚀 Generación Instantánea:** Pega tu script `SQL` (compatible con MySQL, PostgreSQL y SQL Server) y visualiza tu modelo relacional al momento.
+* **🧠 Lienzo Interactivo y Flexible:** Arrastra, suelta y acomoda las tablas libremente para diseñar la distribución que mejor se adapte a tu proyecto.
+* **🎨 Personalización Visual:** Cambia el color de las tablas para identificar rápidamente módulos, microservicios o áreas lógicas.
+* **💾 Exportación e Importación:** Guarda tus diagramas en formatos de alta calidad como **PNG** o **PDF** listos para tu documentación, o exporta el estado del diseño para seguir editándolo después.
+* **🔒 Privacidad Garantizada:** Al ejecutarse localmente en el navegador, tus scripts de bases de datos nunca viajan a ningún servidor externo.
