@@ -14,10 +14,14 @@ function App() {
   const [linePathHistory, setLinePathHistory] = useState({});
   const [showLayers, setShowLayers] = useState(false);
   const [leftTab, setLeftTab] = useState('sql');
+  const [genDialect, setGenDialect] = useState('mysql');
+  const [isParsing, setIsParsing] = useState(false);
   const parseTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const issues = useMemo(() => detectIssues(tables, positions), [tables, positions]);
+  const generatedMySQL = useMemo(() => tables.length > 0 ? generateMySQL(tables) : '', [tables]);
+  const generatedPostgreSQL = useMemo(() => tables.length > 0 ? generatePostgreSQL(tables) : '', [tables]);
 
   const handleArrange = useCallback(() => {
     if (tables.length === 0) return;
@@ -27,15 +31,15 @@ function App() {
   }, [tables, positions]);
 
   const syncSqlToTables = useCallback((value) => {
-    setSql(value); setError(null);
+    value = stripSQLComments(value); setSql(value); setError(null); setIsParsing(true);
     if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
     parseTimeoutRef.current = setTimeout(() => {
       try {
-        if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); return; }
+        if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setIsParsing(false); return; }
         const parsed = parseSQL(value);
-        if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); return; }
-        setPositions(autoLayout(parsed)); setTables(parsed); setSelectedTables({}); setError(null);
-      } catch (e) { setError('Error: ' + e.message); }
+        if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); setIsParsing(false); return; }
+        setPositions(autoLayout(parsed)); setTables(parsed); setSelectedTables({}); setError(null); setIsParsing(false);
+      } catch (e) { setError('Error: ' + e.message); setIsParsing(false); }
     }, 400);
   }, []);
 
@@ -223,7 +227,58 @@ function App() {
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`${showLeft ? 'w-[460px]' : 'w-0'} transition-all duration-300 overflow-hidden shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30`}>
           <div className="w-[460px] p-2.5 h-full flex flex-col">
+            <div className="flex items-center gap-1 mb-2 shrink-0 border-b border-[#30363d]/40 pb-2.5">
+              <button onClick={() => setLeftTab('sql')}
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${leftTab === 'sql' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d]/50 border border-transparent'}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                Editor
+              </button>
+              <button onClick={() => setLeftTab('ddl')}
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${leftTab === 'ddl' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d]/50 border border-transparent'}`}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                DDL
+              </button>
+              <div className="flex-1" />
+              {tables.length > 0 && (
+                <span className="text-[10px] text-[#6e7681] bg-[#21262d]/60 border border-[#30363d]/40 rounded-full px-2.5 py-0.5 font-medium">
+                  {tables.length} {tables.length === 1 ? 'tabla' : 'tablas'}
+                </span>
+              )}
+              {isParsing && (
+                <span className="text-[10px] text-[#d29922] bg-[#d29922]/10 rounded-full px-2.5 py-0.5 font-medium flex items-center gap-1">
+                  <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  Analizando
+                </span>
+              )}
+            </div>
             {leftTab === 'sql' && <SqlEditor sql={sql} onChange={syncSqlToTables} />}
+            {leftTab === 'ddl' && (
+              <div className="h-full flex flex-col">
+                <div className="flex items-center gap-1.5 mb-2.5 shrink-0">
+                  <span className="text-[10px] text-[#6e7681] uppercase tracking-wider font-semibold">Dialecto:</span>
+                  {[
+                    { id: 'mysql', label: 'MySQL' },
+                    { id: 'postgresql', label: 'PostgreSQL' }
+                  ].map(d => (
+                    <button key={d.id} onClick={() => setGenDialect(d.id)}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${genDialect === d.id ? 'bg-[#238636]/20 text-[#3fb950] border border-[#3fb950]/30 shadow-sm' : 'text-[#6e7681] hover:text-[#c9d1d9] border border-transparent hover:border-[#30363d]/50'}`}>
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+                {tables.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[#6e7681] mx-auto mb-3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      <p className="text-[13px] text-[#6e7681]">Escribe SQL en el Editor</p>
+                      <p className="text-[11px] text-[#6e7681] mt-1">para generar el DDL automáticamente</p>
+                    </div>
+                  </div>
+                ) : (
+                  <SqlOutViewer code={genDialect === 'mysql' ? generatedMySQL : generatedPostgreSQL} label="DDL Generado" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 

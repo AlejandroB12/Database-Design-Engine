@@ -124,13 +124,13 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo }) {
   );
   const hlColor = '#ffffff';
   return (
-    <div className={`flex items-center gap-2 px-3 border-b border-[#30363d]/30 last:border-b-0 transition-all ${isHighlight ? 'bg-white/10 border-l-2 border-l-white -ml-px shadow-[inset_2px_0_8px_rgba(255,255,255,0.08)]' : 'hover:bg-[#21262d]/40'}`} style={{ height: 34 }}>
-      <span className="text-[11px] font-mono font-bold px-1.5 rounded leading-none" style={{ color: isHighlight ? hlColor : (typeColor[col.type] || '#94a3b8'), background: (isHighlight ? hlColor : (typeColor[col.type] || '#94a3b8')) + '20' }}>{col.type}</span>
-      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name}</span>
+    <div className={`flex items-center gap-2 px-3 border-b border-[#21262d] last:border-b-0 transition-all ${isHighlight ? 'bg-[#1f6feb]/15 border-l-2 border-l-[#58a6ff] -ml-px' : 'hover:bg-[#161b22]'}`} style={{ height: 32 }}>
+      <span className="text-[10px] font-mono font-semibold px-1.5 rounded leading-none" style={{ color: isHighlight ? hlColor : (typeColor[col.type] || '#8b949e'), background: (isHighlight ? hlColor : (typeColor[col.type] || '#8b949e')) + '15' }}>{col.type}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-[#e6edf3]' : 'text-[#c9d1d9]'}`}>{col.name}</span>
       <div className="flex gap-1 shrink-0">
-        {label && <span className={`text-[10px] font-bold px-1.5 rounded ${isHighlight ? 'bg-white/20 text-white' : badge}`}>{label}</span>}
-        {col.nn && <span className={`text-[10px] font-bold ${isHighlight ? 'text-white/70' : 'text-[#f85149]/70'}`}>NN</span>}
-        {col.ai && <span className={`text-[10px] font-bold ${isHighlight ? 'text-white/70' : 'text-[#3fb950]/70'}`}>AI</span>}
+        {label && <span className={`text-[10px] font-semibold px-1.5 rounded ${isHighlight ? 'bg-white/20 text-white' : badge}`}>{label}</span>}
+        {col.nn && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#f85149]/70'}`}>NN</span>}
+        {col.ai && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#3fb950]/70'}`}>AI</span>}
       </div>
     </div>
   );
@@ -140,25 +140,28 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
   const c = table.color || '#6366f1';
   return (
     <div ref={ref}
-      className={`table-card absolute backdrop-blur rounded-xl border shadow-lg overflow-hidden w-[310px]`}
-      style={{ left: position.x, top: position.y, background: `${c}15`, borderColor: `${c}60`, boxShadow: selected ? `0 0 0 2px ${c}40, 0 4px 20px ${c}20` : '0 4px 12px rgba(0,0,0,0.2)' }}
+      className={`table-card animate-fade-in absolute rounded-lg border overflow-hidden w-[310px]`}
+      style={{ left: position.x, top: position.y, background: '#161b22', borderColor: selected ? c + '80' : '#30363d', boxShadow: selected ? `0 0 0 1px ${c}80, 0 8px 24px rgba(0,0,0,0.4)` : '0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15)' }}
     >
-      <div className="flex items-center justify-between px-3 py-2.5 cursor-grab active:cursor-grabbing select-none"
-        style={{ background: `${c}20`, borderBottom: `1px solid ${c}30` }}
+      <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"
+        style={{ background: `${c}15`, borderBottom: `1px solid ${c}25` }}
         onMouseDown={(e) => onDragStart(e, table.id)}
       >
-        <h3 className="text-sm font-bold text-[#c9d1d9] truncate max-w-[160px]">{table.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
-        <div className="flex items-center gap-1">
-          <span className="text-[11px] text-[#6e7681]">{table.columns.length} col.</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: c }} />
+          <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{table.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[#6e7681] font-medium">{table.columns.length} col.</span>
           {selected && (
             <button onClick={e => { e.stopPropagation(); onDeleteTable(table.id); }}
-              className="text-[#f85149] hover:text-[#f85149] bg-[#f85149]/10 hover:bg-[#f85149]/20 rounded p-1 transition" title="Eliminar tabla">
+              className="text-[#f85149] hover:bg-[#f85149]/20 rounded p-1 transition" title="Eliminar tabla">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             </button>
           )}
         </div>
       </div>
-      <div className="divide-y divide-[#30363d]/30">
+      <div>
         {table.columns.length === 0 ? (
           <div className="px-3 py-4 text-center"><p className="text-[12px] text-[#6e7681] italic">Sin columnas</p></div>
         ) : (
@@ -166,7 +169,7 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
         )}
       </div>
       {selected && (
-        <div className="px-2 py-1.5 border-t border-[#30363d]/30">
+        <div className="px-2 py-1.5 border-t border-[#30363d]">
           <button onClick={e => { e.stopPropagation(); onAddColumn(table.id); }}
             className="w-full text-[11px] font-medium text-[#c9d1d9] hover:text-[#79c0ff] bg-[#1f6feb]/10 hover:bg-[#1f6feb]/20 rounded py-1.5 transition border border-[#58a6ff]/20 hover:border-[#58a6ff]/40">
             + Columna
@@ -557,7 +560,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     <div ref={containerRef}
       className={`diagram-container relative w-full h-full overflow-hidden bg-[#0d1117]/50 ${isPanning ? 'panning' : ''}`}
       onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}>
-      <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
+      <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height, willChange: 'transform' }}>
          <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible' }}>
           <defs>
             <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
@@ -595,7 +598,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
                 <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" className={highlight ? 'line-flow-fast' : 'line-flow'} style={{ pointerEvents: 'none' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 2.5} strokeDasharray="0, 8" strokeLinecap="round" opacity={highlight ? 1 : 0.4} fill="none" className={highlight ? 'line-flow-fast' : ''} style={{ pointerEvents: 'none' }} />
                 <text x={l.startPos.x - 14} y={l.startPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.startLabel}</text>
                 <text x={l.endPos.x + 14} y={l.endPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.endLabel}</text>
                 {(isActive || isHovered) && l.points.map((p, pi) => {
@@ -725,11 +728,11 @@ function SqlEditor({ sql, onChange }) {
         <span className="text-[11px] text-[#6e7681]">{sql.length} caracteres</span>
       </div>
       <div className="flex-1 relative min-h-0">
-        <div className="absolute inset-0 bg-[#161b22] rounded-xl border border-[#30363d]/60">
+        <div className="absolute inset-0 bg-[#0d1117] rounded-lg border border-[#30363d]">
           <div className="sql-editor-wrapper w-full h-full">
-            <pre ref={preRef} className="text-[14px] leading-relaxed font-sans" dangerouslySetInnerHTML={{ __html: html || '&nbsp;' }} />
+            <pre ref={preRef} className="text-[14px] leading-relaxed font-mono" dangerouslySetInnerHTML={{ __html: html || '&nbsp;' }} />
             <textarea ref={textareaRef} value={sql} onChange={e => onChange(e.target.value)} onScroll={handleScroll}
-              placeholder={`Pega o escribe tu código SQL aquí...\n\n✔ Soporta SQL estándar (CREATE TABLE, ALTER TABLE, INSERT, SELECT, etc.)\n✔ Compatible con sintaxis de PostgreSQL\n✔ También acepta MySQL, SQLite y otros dialectos\n✔ Las tablas y relaciones se generarán automáticamente`} className="text-[14px] leading-relaxed font-sans" spellCheck={false} wrap="soft" />
+              placeholder={`Pega o escribe tu código SQL aquí...\n\n✔ Soporta SQL estándar (CREATE TABLE, ALTER TABLE, INSERT, SELECT, etc.)\n✔ Compatible con sintaxis de PostgreSQL\n✔ También acepta MySQL, SQLite y otros dialectos\n✔ Las tablas y relaciones se generarán automáticamente`} className="text-[14px] leading-relaxed font-mono" spellCheck={false} wrap="soft" />
           </div>
         </div>
         <div className="absolute bottom-3 right-3 flex gap-1.5 z-10">
@@ -767,7 +770,7 @@ function SqlOutViewer({ code, label }) {
         </div>
       </div>
       <div className="flex-1 relative min-h-0">
-        <div className="absolute inset-0 bg-[#161b22]/90 rounded-xl border border-[#30363d]/60 overflow-hidden">
+        <div className="absolute inset-0 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-hidden">
           <pre ref={preRef}
             className="w-full h-full p-4 m-0 overflow-auto bg-transparent text-[#c9d1d9]"
             style={{ fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace", fontSize: '13px', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', tabSize: 4 }}
@@ -790,18 +793,18 @@ function TableEditor({ table, onUpdateTable, onClose }) {
   const updCol = (id, field, value) => { const next = cols.map(c => c.id === id ? { ...c, [field]: value } : c); setCols(next); onUpdateTable({ ...table, columns: next }); };
   const delCol = (id) => { const next = cols.filter(c => c.id !== id); setCols(next); onUpdateTable({ ...table, columns: next }); };
   return (
-    <div className="bg-[#21262d]/95 border-t border-[#30363d]/50 p-4 slide-in">
+    <div className="bg-[#161b22] border-t border-[#30363d] p-4 slide-in">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-[#1f6feb]/20 rounded-lg p-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
-          <input value={name} onChange={e => setName(e.target.value)} onBlur={saveName} className="bg-[#30363d] text-sm font-semibold text-[#c9d1d9] rounded px-3 py-1.5 w-44 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none" />
+          <input value={name} onChange={e => setName(e.target.value)} onBlur={saveName} className="bg-[#0d1117] text-sm font-semibold text-[#e6edf3] rounded px-3 py-1.5 w-44 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none border border-[#30363d]" />
           <input type="color" value={table.color || '#6366f1'} onChange={e => onUpdateTable({ ...table, color: e.target.value })} className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent" title="Color de la tabla" />
         </div>
         <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] rounded-lg p-1.5 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1" style={{ maxHeight: 140 }}>
         {cols.map(col => (
-          <div key={col.id} className="flex items-center gap-1.5 bg-[#161b22]/60 rounded-lg px-3 py-2 border border-[#30363d]/30 shrink-0">
+          <div key={col.id} className="flex items-center gap-1.5 bg-[#0d1117] rounded-lg px-3 py-2 border border-[#30363d] shrink-0">
             <input value={col.name} onChange={e => updCol(col.id, 'name', e.target.value)} placeholder="col" className="w-20 bg-[#21262d] text-[12px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681]" />
             <select value={col.type} onChange={e => updCol(col.id, 'type', e.target.value)} className="w-20 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none">{COLUMN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
             {['VARCHAR','CHAR'].includes(col.type) && (<input type="number" value={col.length || 255} onChange={e => updCol(col.id, 'length', parseInt(e.target.value) || 255)} className="w-12 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none" />)}
@@ -817,15 +820,15 @@ function TableEditor({ table, onUpdateTable, onClose }) {
 
 function LayerPanel({ layers, tables, selectedTables, onAddLayer, onRemoveLayer, onUpdateLayer, onAssignSelected, onClose }) {
   return (
-    <div className="absolute top-0 right-0 w-80 h-full bg-[#21262d]/95 backdrop-blur border-l border-[#30363d]/50 z-30 slide-in p-4 overflow-y-auto">
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 slide-in p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[#c9d1d9] flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Capas</h3>
+        <h3 className="text-sm font-semibold text-[#e6edf3] flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Capas</h3>
         <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1.5 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
-      <button onClick={onAddLayer} className="w-full text-[11px] text-[#6e7681] hover:text-[#58a6ff] bg-[#161b22]/60 hover:bg-[#30363d] rounded-lg py-2 mb-4 transition border border-dashed border-[#30363d] hover:border-[#58a6ff]/50 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Capa</button>
+      <button onClick={onAddLayer} className="w-full text-[11px] text-[#6e7681] hover:text-[#58a6ff] bg-[#0d1117] hover:bg-[#21262d] rounded-lg py-2 mb-4 transition border border-dashed border-[#30363d] hover:border-[#58a6ff]/50 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Capa</button>
       {layers.length === 0 && <p className="text-[12px] text-[#6e7681] text-center py-6">No hay capas.</p>}
       {layers.map(layer => (
-        <div key={layer.id} className="mb-3 bg-[#161b22]/40 rounded-xl border border-[#30363d]/40 overflow-hidden">
+        <div key={layer.id} className="mb-3 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2.5">
             <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: layer.color }} />
             <input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} className="flex-1 bg-transparent text-[13px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white" />

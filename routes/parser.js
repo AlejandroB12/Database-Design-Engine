@@ -71,10 +71,14 @@ function parseCardinalityHints(sql) {
   return hints;
 }
 
+function stripSQLComments(sql) {
+  return sql.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\n\s*\n/g, '\n').trim();
+}
+
 function parseSQL(sql) {
   const tables = [];
   const cardHints = parseCardinalityHints(sql);
-  let clean = sql.replace(/--.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+  let clean = stripSQLComments(sql);
   const stmts = clean.split(';').map(s => s.trim()).filter(s => s);
   let tableIdx = 0;
   for (const stmt of stmts) {
