@@ -184,7 +184,7 @@ function App() {
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".sql" onChange={handleImportFile} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
-            className="text-[12px] text-[#6e7681] hover:text-[#3fb950] bg-[#21262d]/80 hover:bg-[#30363d] rounded-lg px-3 h-8 flex items-center transition border border-[#30363d]/50" title="Importar archivo SQL">
+            className="text-[12px] text-[#6e7681]  bg-[#21262d]/80  rounded-lg px-3 h-8 flex items-center  border border-[#30363d]/50" title="Importar archivo SQL">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 shrink-0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Importar SQL
           </button>
@@ -193,17 +193,17 @@ function App() {
             <div className="w-px h-6 bg-[#30363d]/50 mx-1" />
             <div className="flex bg-[#21262d]/80 rounded-lg border border-[#30363d]/50 overflow-hidden">
               <button data-export="png" onClick={() => exportPNG(`diagrama-${Date.now()}.png`)}
-                className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681] hover:text-[#58a6ff] transition border-x border-[#30363d]/50 flex items-center gap-1" title="Exportar PNG">
+                className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681]   border-x border-[#30363d]/50 flex items-center gap-1" title="Exportar PNG">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
               </button>
               <button data-export="pdf" onClick={() => exportPDF(`diagrama-${Date.now()}.pdf`)}
-                className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681] hover:text-[#f85149] transition flex items-center gap-1" title="Exportar PDF">
+                className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681]   flex items-center gap-1" title="Exportar PDF">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
               </button>
             </div>
           </>}
           {tables.length > 0 && <button onClick={handleArrange}
-            className="text-[12px] text-[#6e7681] hover:text-[#3fb950] bg-[#21262d]/80 hover:bg-[#30363d] rounded-lg px-3 h-8 flex items-center transition border border-[#30363d]/50 gap-1.5 mr-1"
+            className="text-[12px] text-[#6e7681]  bg-[#21262d]/80  rounded-lg px-3 h-8 flex items-center  border border-[#30363d]/50 gap-1.5 mr-1"
             title="Ordenar tablas automáticamente (resuelve solapamientos y cruces)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
@@ -216,7 +216,7 @@ function App() {
             )}
           </button>}
           {tables.length > 0 && <button onClick={() => setShowLayers(s => !s)}
-            className={`text-[12px] rounded-lg px-3 h-8 flex items-center transition border ${showLayers || layers.length > 0 ? 'text-[#a371f7] bg-[#a371f7]/15 border-[#a371f7]/30' : 'text-[#6e7681] hover:text-[#a371f7] bg-[#21262d]/80 hover:bg-[#30363d] border-[#30363d]/50'}`}>
+            className={`text-[12px] rounded-lg px-3 h-8 flex items-center border ${showLayers || layers.length > 0 ? 'text-[#a371f7] bg-[#a371f7]/15 border-[#a371f7]/30' : 'text-[#6e7681] bg-[#21262d]/80 border-[#30363d]/50'}`}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Capas {layers.length > 0 && <span className="ml-1 text-[10px] opacity-60">({layers.length})</span>}
           </button>}
@@ -225,16 +225,16 @@ function App() {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div className={`${showLeft ? 'w-[460px]' : 'w-0'} transition-all duration-300 overflow-hidden shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30`}>
+        <div className={`${showLeft ? 'w-[460px]' : 'w-0'} overflow-hidden shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30`}>
           <div className="w-[460px] p-2.5 h-full flex flex-col">
             <div className="flex items-center gap-1 mb-2 shrink-0 border-b border-[#30363d]/40 pb-2.5">
               <button onClick={() => setLeftTab('sql')}
-                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${leftTab === 'sql' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d]/50 border border-transparent'}`}>
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium  flex items-center gap-1.5 ${leftTab === 'sql' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681]   border border-transparent'}`}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                 Editor
               </button>
               <button onClick={() => setLeftTab('ddl')}
-                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium transition-all flex items-center gap-1.5 ${leftTab === 'ddl' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681] hover:text-[#c9d1d9] hover:bg-[#21262d]/50 border border-transparent'}`}>
+                className={`text-[11px] px-3 py-1.5 rounded-lg font-medium  flex items-center gap-1.5 ${leftTab === 'ddl' ? 'bg-[#1f6feb]/15 text-[#58a6ff] shadow-sm border border-[#58a6ff]/20' : 'text-[#6e7681]   border border-transparent'}`}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 DDL
               </button>
@@ -246,7 +246,7 @@ function App() {
               )}
               {isParsing && (
                 <span className="text-[10px] text-[#d29922] bg-[#d29922]/10 rounded-full px-2.5 py-0.5 font-medium flex items-center gap-1">
-                  <svg className="animate-spin" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                  <svg className="" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
                   Analizando
                 </span>
               )}
@@ -261,7 +261,7 @@ function App() {
                     { id: 'postgresql', label: 'PostgreSQL' }
                   ].map(d => (
                     <button key={d.id} onClick={() => setGenDialect(d.id)}
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${genDialect === d.id ? 'bg-[#238636]/20 text-[#3fb950] border border-[#3fb950]/30 shadow-sm' : 'text-[#6e7681] hover:text-[#c9d1d9] border border-transparent hover:border-[#30363d]/50'}`}>
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg  ${genDialect === d.id ? 'bg-[#238636]/20 text-[#3fb950] border border-[#3fb950]/30 shadow-sm' : 'text-[#6e7681]  border border-transparent '}`}>
                       {d.label}
                     </button>
                   ))}
@@ -283,16 +283,16 @@ function App() {
         </div>
 
         <button onClick={() => setShowLeft(!showLeft)}
-          className="absolute top-3 z-20 bg-[#21262d]/90 border border-[#30363d]/60 rounded-r-lg p-2 hover:bg-[#30363d] hover:text-[#c9d1d9] transition-all shadow-lg cursor-pointer group"
+          className="absolute top-3 z-20 bg-[#21262d]/90 border border-[#30363d]/60 rounded-r-lg p-2    shadow-lg "
           style={{ left: showLeft ? '460px' : '0' }}
           title={showLeft ? 'Ocultar panel (Ctrl+B)' : 'Mostrar panel (Ctrl+B)'}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8b949e] group-hover:text-[#c9d1d9] transition-colors">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8b949e] ">
             <path d={showLeft ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
           </svg>
         </button>
 
         {tables.length > 0 && (
-        <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
+        <div className="flex-1 flex flex-col overflow-hidden ">
           <div className="flex-1 relative flex overflow-hidden">
             <div className="flex-1 relative diagram-container overflow-hidden">
               <Diagram
@@ -339,7 +339,7 @@ function App() {
             <TableEditor table={selectedTableData} onUpdateTable={updateTable} onClose={() => setSelectedTables({})} />
           )}
           {Object.keys(selectedTables).length > 1 && (
-            <div className="bg-[#21262d]/95 border-t border-[#30363d]/50 p-4 slide-in">
+            <div className="bg-[#21262d]/95 border-t border-[#30363d]/50 p-4">
               <p className="text-sm text-[#8b949e] text-center">{Object.keys(selectedTables).length} tablas seleccionadas</p>
             </div>
           )}

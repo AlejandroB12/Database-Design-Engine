@@ -1,8 +1,22 @@
-function generateMySQL(tables) {
+function generateMySQL(tables, categories, tableCategory) {
   const lines = [];
+  const catByTable = {};
+  if (categories && tableCategory) {
+    for (const tid of Object.keys(tableCategory)) {
+      const catId = tableCategory[tid];
+      const cat = categories.find(c => c.id === catId);
+      if (cat) catByTable[tid] = [cat.name];
+    }
+  }
   for (const t of tables) {
     if (!t.name || t.columns.length === 0) continue;
     const tn = sanitize(t.name);
+    const tableCats = catByTable[t.id];
+    if (tableCats && tableCats.length > 0) {
+      for (const catName of tableCats) {
+        lines.push(`-- Categoría: ${catName}`);
+      }
+    }
     const cols = [];
     const pks = t.columns.filter(c => c.pk).map(c => sanitize(c.name));
     for (const c of t.columns) {

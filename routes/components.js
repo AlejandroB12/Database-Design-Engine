@@ -124,7 +124,7 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo }) {
   );
   const hlColor = '#ffffff';
   return (
-    <div className={`flex items-center gap-2 px-3 border-b border-[#21262d] last:border-b-0 transition-all ${isHighlight ? 'bg-[#1f6feb]/15 border-l-2 border-l-[#58a6ff] -ml-px' : 'hover:bg-[#161b22]'}`} style={{ height: 32 }}>
+    <div className={`flex items-center gap-2 px-3 border-b border-[#21262d] last:border-b-0 ${isHighlight ? 'bg-[#1f6feb]/15 border-l-2 border-l-[#58a6ff] -ml-px' : ''}`} style={{ height: 32 }}>
       <span className="text-[10px] font-mono font-semibold px-1.5 rounded leading-none" style={{ color: isHighlight ? hlColor : (typeColor[col.type] || '#8b949e'), background: (isHighlight ? hlColor : (typeColor[col.type] || '#8b949e')) + '15' }}>{col.type}</span>
       <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-[#e6edf3]' : 'text-[#c9d1d9]'}`}>{col.name}</span>
       <div className="flex gap-1 shrink-0">
@@ -140,7 +140,7 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
   const c = table.color || '#6366f1';
   return (
     <div ref={ref}
-      className={`table-card animate-fade-in absolute rounded-lg border overflow-hidden w-[310px]`}
+      className={`table-card  absolute rounded-lg border overflow-hidden w-[310px]`}
       style={{ left: position.x, top: position.y, background: '#161b22', borderColor: selected ? c + '80' : '#30363d', boxShadow: selected ? `0 0 0 1px ${c}80, 0 8px 24px rgba(0,0,0,0.4)` : '0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15)' }}
     >
       <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"
@@ -155,7 +155,7 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
           <span className="text-[11px] text-[#6e7681] font-medium">{table.columns.length} col.</span>
           {selected && (
             <button onClick={e => { e.stopPropagation(); onDeleteTable(table.id); }}
-              className="text-[#f85149] hover:bg-[#f85149]/20 rounded p-1 transition" title="Eliminar tabla">
+              className="text-[#f85149]  rounded p-1" title="Eliminar tabla">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             </button>
           )}
@@ -171,7 +171,7 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
       {selected && (
         <div className="px-2 py-1.5 border-t border-[#30363d]">
           <button onClick={e => { e.stopPropagation(); onAddColumn(table.id); }}
-            className="w-full text-[11px] font-medium text-[#c9d1d9] hover:text-[#79c0ff] bg-[#1f6feb]/10 hover:bg-[#1f6feb]/20 rounded py-1.5 transition border border-[#58a6ff]/20 hover:border-[#58a6ff]/40">
+            className="w-full text-[11px] font-medium text-[#c9d1d9] bg-[#1f6feb]/10 rounded py-1.5 border border-[#58a6ff]/20">
             + Columna
           </button>
         </div>
@@ -205,6 +205,12 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
   tableDimsRef.current = tableDims;
   const [selRect, setSelRect] = useState(null);
   const selRectRef = useRef(null);
+  const rafRef = useRef(null);
+  const pendingMouseEvent = useRef(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
 
   useEffect(() => { if (activeLayerId && !layers.find(l => l.id === activeLayerId)) setActiveLayerId(null); }, [layers, activeLayerId]);
 
@@ -315,13 +321,13 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     }
     dragRef.current = dragInfo;
     document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [positions, tables, linePaths, multiDragMode]);
+  }, [positions, tables, linePaths, multiDragMode, handleMouseMove, handleMouseUp]);
 
   const handleWaypointMove = useCallback((e) => {
     const dr = waypointDragRef.current;
     if (!dr) return;
-    const dx = (e.clientX - dr.startX) / zoom;
-    const dy = (e.clientY - dr.startY) / zoom;
+    const dx = (e.clientX - dr.startX) / zoomRef.current;
+    const dy = (e.clientY - dr.startY) / zoomRef.current;
     const pi = dr.pointIndex;
     const orig = dr.origPoints;
     if (pi <= 0 || pi >= orig.length - 1) {
@@ -353,7 +359,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     }
     const snappedPoints = snapEndpoints(newPoints, dr.lineKey, tablesRef.current, positionsRef.current, tableDimsRef.current);
     onUpdateLinePath(dr.lineKey, snappedPoints);
-  }, [zoom, onUpdateLinePath]);
+  }, [onUpdateLinePath]);
 
   const handleLineMouseDown = useCallback((e, lineKey, points) => {
     e.stopPropagation();
@@ -398,30 +404,9 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     onUpdateLinePath(lineKey, newPoints);
   }, [onUpdateLinePath, onResetLinePath]);
 
-  const handleMouseMove = useCallback((e) => {
-    if (selRectRef.current) {
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const mx = (e.clientX - rect.left - pan.x) / zoom;
-      const my = (e.clientY - rect.top - pan.y) / zoom;
-      selRectRef.current = { ...selRectRef.current, endX: mx, endY: my };
-      setSelRect({ ...selRectRef.current });
-      return;
-    }
-    if (layerResizeRef.current) {
-      const dr = layerResizeRef.current; const dx = (e.clientX - dr.startX) / zoom; const dy = (e.clientY - dr.startY) / zoom;
-      const upd = {}; const minW = 100, minH = 60;
-      if (dr.sx === 1) upd.w = Math.max(minW, dr.origW + dx); else { upd.x = dr.origX + dx; upd.w = Math.max(minW, dr.origW - dx); }
-      if (dr.sy === 1) upd.h = Math.max(minH, dr.origH + dy); else { upd.y = dr.origY + dy; upd.h = Math.max(minH, dr.origH - dy); }
-      onUpdateLayer(dr.layerId, upd); if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true; return;
-    }
-    if (layerDragRef.current) {
-      const dr = layerDragRef.current; const dx = (e.clientX - dr.startX) / zoom; const dy = (e.clientY - dr.startY) / zoom;
-      if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
-      onUpdateLayer(dr.layerId, { x: dr.origX + dx, y: dr.origY + dy }); return;
-    }
+  const processMouseEvent = useCallback((e) => {
     if (dragRef.current) {
-      const dr = dragRef.current; const dx = (e.clientX - dr.startX) / zoom; const dy = (e.clientY - dr.startY) / zoom;
+      const dr = dragRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
       if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
       if (dr.origins) { for (const id of Object.keys(dr.origins)) onPositionsChange(id, dr.origins[id].x + dx, dr.origins[id].y + dy); }
       else onPositionsChange(dr.tableId, dr.origX + dx, dr.origY + dy);
@@ -448,7 +433,41 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     }
     if (panDragRef.current) { setPan({ x: panDragRef.current.origPanX + (e.clientX - panDragRef.current.startX), y: panDragRef.current.origPanY + (e.clientY - panDragRef.current.startY) }); }
     handleWaypointMove(e);
-  }, [zoom, onPositionsChange, onUpdateLayer, handleWaypointMove, onUpdateLinePath]);
+  }, [onPositionsChange, handleWaypointMove, onUpdateLinePath]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (selRectRef.current) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mx = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
+      const my = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
+      selRectRef.current = { ...selRectRef.current, endX: mx, endY: my };
+      setSelRect({ ...selRectRef.current });
+      return;
+    }
+    if (layerResizeRef.current) {
+      const dr = layerResizeRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
+      const upd = {}; const minW = 100, minH = 60;
+      if (dr.sx === 1) upd.w = Math.max(minW, dr.origW + dx); else { upd.x = dr.origX + dx; upd.w = Math.max(minW, dr.origW - dx); }
+      if (dr.sy === 1) upd.h = Math.max(minH, dr.origH + dy); else { upd.y = dr.origY + dy; upd.h = Math.max(minH, dr.origH - dy); }
+      onUpdateLayer(dr.layerId, upd); if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true; return;
+    }
+    if (layerDragRef.current) {
+      const dr = layerDragRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
+      if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
+      onUpdateLayer(dr.layerId, { x: dr.origX + dx, y: dr.origY + dy }); return;
+    }
+    pendingMouseEvent.current = e;
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const ev = pendingMouseEvent.current;
+        if (ev && (dragRef.current || panDragRef.current || waypointDragRef.current)) {
+          processMouseEvent(ev);
+        }
+      });
+    }
+  }, [onUpdateLayer, processMouseEvent]);
 
   const handleMouseUp = useCallback((e) => {
     layerResizeRef.current = null; layerDragRef.current = null;
@@ -477,10 +496,12 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     }
     if (dragRef.current) { if (!dragRef.current.moved && e.target.closest('.table-card')) onSelectTable(dragRef.current.tableId, e.ctrlKey || e.metaKey); dragRef.current = null; }
     if (panDragRef.current) { panDragRef.current = null; setIsPanning(false); }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    pendingMouseEvent.current = null;
     document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp);
   }, [onSelectTable, onSelectTables]);
 
-  useEffect(() => { return () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); }; }, [handleMouseMove, handleMouseUp]);
+  useEffect(() => { return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); }; }, [handleMouseMove, handleMouseUp]);
 
   const handleWaypointHandleMouseDown = useCallback((e, lineKey, pointIndex) => {
     e.stopPropagation();
@@ -527,7 +548,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     }
     panDragRef.current = { startX: e.clientX, startY: e.clientY, origPanX: pan.x, origPanY: pan.y };
     setIsPanning(true); document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [pan.x, pan.y, multiDragMode, zoom]);
+  }, [pan.x, pan.y, multiDragMode, zoom, handleMouseMove, handleMouseUp]);
 
   const canvasBounds = useMemo(() => {
     const container = containerRef.current;
@@ -560,7 +581,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     <div ref={containerRef}
       className={`diagram-container relative w-full h-full overflow-hidden bg-[#0d1117]/50 ${isPanning ? 'panning' : ''}`}
       onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}>
-      <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height, willChange: 'transform' }}>
+      <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
          <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible' }}>
           <defs>
             <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
@@ -598,7 +619,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
                 <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 2.5} strokeDasharray="0, 8" strokeLinecap="round" opacity={highlight ? 1 : 0.4} fill="none" className={highlight ? 'line-flow-fast' : ''} style={{ pointerEvents: 'none' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 2.5} strokeDasharray="0, 8" strokeLinecap="round" opacity={highlight ? 1 : 0.4} fill="none" style={{ pointerEvents: 'none' }} />
                 <text x={l.startPos.x - 14} y={l.startPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.startLabel}</text>
                 <text x={l.endPos.x + 14} y={l.endPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.endLabel}</text>
                 {(isActive || isHovered) && l.points.map((p, pi) => {
@@ -629,13 +650,13 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
           const layer = layers.find(l => l.id === activeLayerId); if (!layer) return null;
           const px = pan.x + (layer.x + layer.w / 2) * zoom; const py = pan.y + layer.y * zoom - 8;
           return (
-            <div className="absolute z-30 fade-in" style={{ left: px, top: py, transform: 'translate(-50%, -100%)' }} onMouseDown={e => e.stopPropagation()}>
-              <div className="bg-[#21262d]/95 backdrop-blur border border-[#30363d]/60 rounded-xl shadow-xl p-3 min-w-[200px]">
-                <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: layer.color }} /><input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} onClick={e => e.stopPropagation()} className="flex-1 bg-transparent text-[13px] text-[#c9d1d9] font-medium focus:outline-none" /><button onClick={() => setActiveLayerId(null)} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded transition"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+            <div className="absolute z-30" style={{ left: px, top: py, transform: 'translate(-50%, -100%)' }} onMouseDown={e => e.stopPropagation()}>
+              <div className="bg-[#21262d]/95  border border-[#30363d]/60 rounded-xl shadow-xl p-3 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-2"><div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: layer.color }} /><input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} onClick={e => e.stopPropagation()} className="flex-1 bg-transparent text-[13px] text-[#c9d1d9] font-medium focus:outline-none" /><button onClick={() => setActiveLayerId(null)} className="text-[#6e7681]  p-1 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
                 <div className="flex items-center gap-2 mb-2"><input type="color" value={layer.color} onChange={e => onUpdateLayer(layer.id, { color: e.target.value })} className="w-6 h-6 rounded cursor-pointer border-0 p-0" /><span className="text-[11px] text-[#6e7681]">Color</span></div>
                 <div className="mb-2"><div className="text-[11px] text-[#6e7681] mb-1">Tablas ({layer.tableIds.length})</div>{layer.tableIds.length === 0 ? (<div className="text-[11px] text-[#6e7681] italic">Ninguna</div>) : (<div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto">{layer.tableIds.map(tid => { const t = tables.find(t2 => t2.id === tid); return t ? <span key={tid} className="text-[10px] text-[#8b949e] bg-[#30363d]/50 rounded px-1.5 py-0.5">{t.name}</span> : null; })}</div>)}</div>
-                {Object.keys(selectedTables).length > 0 && (<button onClick={e => { e.stopPropagation(); onUpdateLayer(layer.id, { tableIds: [...new Set([...layer.tableIds, ...Object.keys(selectedTables)])] }); }} className="text-[10px] text-[#58a6ff] hover:text-[#79c0ff] bg-[#1f6feb]/10 hover:bg-[#1f6feb]/20 rounded px-2 py-1 transition w-full mb-2">+ Asignar {Object.keys(selectedTables).length} seleccionadas</button>)}
-                <button onClick={() => { onRemoveLayer(layer.id); setActiveLayerId(null); }} className="text-[10px] text-[#6e7681] hover:text-[#f85149] rounded px-2 py-1 transition">Eliminar capa</button>
+                {Object.keys(selectedTables).length > 0 && (<button onClick={e => { e.stopPropagation(); onUpdateLayer(layer.id, { tableIds: [...new Set([...layer.tableIds, ...Object.keys(selectedTables)])] }); }} className="text-[10px] text-[#58a6ff]  bg-[#1f6feb]/10  rounded px-2 py-1 w-full mb-2">+ Asignar {Object.keys(selectedTables).length} seleccionadas</button>)}
+                <button onClick={() => { onRemoveLayer(layer.id); setActiveLayerId(null); }} className="text-[10px] text-[#6e7681]  rounded px-2 py-1">Eliminar capa</button>
               </div>
             </div>
           );
@@ -661,19 +682,19 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
         const cardOptions = ['M:1', '1:1', '1:M', 'M:M'];
         const cardLabels = { 'M:1': 'Muchos a Uno', '1:1': 'Uno a Uno', '1:M': 'Uno a Muchos', 'M:M': 'Muchos a Muchos' };
         return (
-          <div className="absolute top-4 left-4 bg-[#21262d]/90 backdrop-blur border border-white/20 rounded-xl p-3 shadow-lg z-20 fade-in">
+          <div className="absolute top-4 left-4 bg-[#21262d]/90  border border-white/20 rounded-xl p-3 shadow-lg z-20">
             <div className="flex items-center gap-3 mb-2">
               <div className="text-center"><div className="text-[12px] text-[#6e7681]">Origen</div><div className="text-sm font-semibold text-white">{srcTable?.name || '?'}.{info.column}</div></div>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               <div className="text-center"><div className="text-[12px] text-[#6e7681]">Destino</div><div className="text-sm font-semibold text-white">{info.refTable}.{info.refColumn}</div></div>
-              {activeFk && <button onClick={() => setActiveFk(null)} className="text-[#6e7681] hover:text-[#c9d1d9] p-0.5 rounded transition"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>}
+              {activeFk && <button onClick={() => setActiveFk(null)} className="text-[#6e7681]  p-0.5 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>}
             </div>
             {activeFk && onUpdateRef && (
               <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2">
                 <span className="text-[11px] text-[#6e7681] shrink-0">Cardinalidad:</span>
                 {cardOptions.map(c => (
                   <button key={c} onClick={e => { e.stopPropagation(); onUpdateRef(info.tableId, info.column, info.refTable, c); }}
-                    className={`text-[10px] font-mono font-bold px-2 py-1 rounded border transition ${info.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681] hover:text-[#c9d1d9]'}`}
+                    className={`text-[10px] font-mono font-bold px-2 py-1 rounded border ${info.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681] '}`}
                     title={cardLabels[c]}>{c}</button>
                 ))}
               </div>
@@ -682,10 +703,10 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
               <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2 mt-2">
                 <span className="text-[11px] text-[#6e7681] shrink-0">Ruta:</span>
                 <button onClick={e => { e.stopPropagation(); onResetLinePath(key); }}
-                  className="text-[10px] font-bold px-2 py-1 rounded border transition bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149] hover:bg-[#f85149]/30"
+                  className="text-[10px] font-bold px-2 py-1 rounded border bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]"
                   title="Restaurar ruta automática">✕ Auto</button>
                 <button onClick={e => { e.stopPropagation(); onUndoLinePath && onUndoLinePath(key); }}
-                  className="text-[10px] font-bold px-2 py-1 rounded border transition bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff] hover:bg-[#1f6feb]/30"
+                  className="text-[10px] font-bold px-2 py-1 rounded border bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]"
                   title="Deshacer último cambio">↩ Deshacer</button>
               </div>
             )}
@@ -693,21 +714,21 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
         );
       })()}
       {tables.length > 0 && (
-        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90 backdrop-blur border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
+        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90  border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
           <button onClick={onToggleMultiDrag}
-            className={`rounded-lg w-9 h-9 flex items-center justify-center transition ${multiDragMode ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#8b949e] hover:text-[#58a6ff] bg-[#30363d]/50 hover:bg-[#30363d]'}`}
+            className={`rounded-lg w-9 h-9 flex items-center justify-center ${multiDragMode ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#8b949e]  bg-[#30363d]/50 '}`}
             title={multiDragMode ? 'Seleccionar área activado' : 'Seleccionar área'}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 2" />
             </svg>
           </button>
-          <button onClick={() => onShowLayerPanel && onShowLayerPanel(true)} className="text-[#8b949e] hover:text-[#a371f7] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center transition" title="Capas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
-          <button onClick={fitToScreen} className="text-[#8b949e] hover:text-[#3fb950] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center transition" title="Ajustar al contenedor">
+          <button onClick={() => onShowLayerPanel && onShowLayerPanel(true)} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center" title="Capas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+          <button onClick={fitToScreen} className="text-[#8b949e]  bg-[#30363d]/50  rounded-lg w-9 h-9 flex items-center justify-center" title="Ajustar al contenedor">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
           </button>
-          <button onClick={() => onUpdateTable(null, null, -0.1)} className="text-[#8b949e] hover:text-[#c9d1d9] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold transition">-</button>
+          <button onClick={() => onUpdateTable(null, null, -0.1)} className="text-[#8b949e]  bg-[#30363d]/50  rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">-</button>
           <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
-          <button onClick={() => onUpdateTable(null, null, 0.1)} className="text-[#8b949e] hover:text-[#c9d1d9] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold transition">+</button>
+          <button onClick={() => onUpdateTable(null, null, 0.1)} className="text-[#8b949e]  bg-[#30363d]/50  rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">+</button>
         </div>
       )}
     </div>
@@ -737,12 +758,12 @@ function SqlEditor({ sql, onChange }) {
         </div>
         <div className="absolute bottom-3 right-3 flex gap-1.5 z-10">
           <button onClick={() => navigator.clipboard.writeText(sql)}
-            className="text-[11px] text-[#8b949e] hover:text-[#58a6ff] bg-[#21262d]/90 hover:bg-[#58a6ff]/20 border border-[#6e7681]/60 hover:border-[#58a6ff]/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium"
+            className="text-[11px] text-[#8b949e] bg-[#21262d]/90 border border-[#6e7681]/60 rounded-lg px-3 py-1.5 font-medium"
             title="Copiar código SQL">Copiar</button>
           <button onClick={async () => { const text = await navigator.clipboard.readText(); onChange(text); }}
-            className="text-[11px] text-[#8b949e] hover:text-[#d29922] bg-[#21262d]/90 hover:bg-[#d29922]/20 border border-[#6e7681]/60 hover:border-[#d29922]/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium"
+            className="text-[11px] text-[#8b949e] bg-[#21262d]/90 border border-[#6e7681]/60 rounded-lg px-3 py-1.5 font-medium"
             title="Pegar código SQL">Pegar</button>
-          <button onClick={() => onChange('')} className="text-[11px] text-[#8b949e] hover:text-[#f85149] bg-[#21262d]/90 hover:bg-[#f85149]/20 border border-[#6e7681]/60 hover:border-red-500/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium">Limpiar</button>
+          <button onClick={() => onChange('')} className="text-[11px] text-[#8b949e] bg-[#21262d]/90 border border-[#6e7681]/60 rounded-lg px-3 py-1.5 font-medium">Limpiar</button>
         </div>
       </div>
     </div>
@@ -763,7 +784,7 @@ function SqlOutViewer({ code, label }) {
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-[#6e7681] font-mono">{lineCount} líneas</span>
           <button onClick={() => { navigator.clipboard.writeText(code); }}
-            className="text-[11px] text-[#6e7681] hover:text-[#58a6ff] bg-[#21262d]/80 hover:bg-[#30363d] border border-[#30363d]/50 rounded-lg px-3 py-1.5 transition backdrop-blur flex items-center gap-1">
+            className="text-[11px] text-[#6e7681]  bg-[#21262d]/80  border border-[#30363d]/50 rounded-lg px-3 py-1.5  flex items-center gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             Copiar
           </button>
@@ -793,14 +814,14 @@ function TableEditor({ table, onUpdateTable, onClose }) {
   const updCol = (id, field, value) => { const next = cols.map(c => c.id === id ? { ...c, [field]: value } : c); setCols(next); onUpdateTable({ ...table, columns: next }); };
   const delCol = (id) => { const next = cols.filter(c => c.id !== id); setCols(next); onUpdateTable({ ...table, columns: next }); };
   return (
-    <div className="bg-[#161b22] border-t border-[#30363d] p-4 slide-in">
+    <div className="bg-[#161b22] border-t border-[#30363d] p-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <div className="bg-[#1f6feb]/20 rounded-lg p-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
           <input value={name} onChange={e => setName(e.target.value)} onBlur={saveName} className="bg-[#0d1117] text-sm font-semibold text-[#e6edf3] rounded px-3 py-1.5 w-44 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none border border-[#30363d]" />
           <input type="color" value={table.color || '#6366f1'} onChange={e => onUpdateTable({ ...table, color: e.target.value })} className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent" title="Color de la tabla" />
         </div>
-        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] rounded-lg p-1.5 transition"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <button onClick={onClose} className="text-[#6e7681]  rounded-lg p-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1" style={{ maxHeight: 140 }}>
         {cols.map(col => (
@@ -808,11 +829,11 @@ function TableEditor({ table, onUpdateTable, onClose }) {
             <input value={col.name} onChange={e => updCol(col.id, 'name', e.target.value)} placeholder="col" className="w-20 bg-[#21262d] text-[12px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681]" />
             <select value={col.type} onChange={e => updCol(col.id, 'type', e.target.value)} className="w-20 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none">{COLUMN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
             {['VARCHAR','CHAR'].includes(col.type) && (<input type="number" value={col.length || 255} onChange={e => updCol(col.id, 'length', parseInt(e.target.value) || 255)} className="w-12 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none" />)}
-            <div className="flex gap-0.5">{[{k:'pk',l:'PK'},{k:'ai',l:'AI'},{k:'nn',l:'NN'},{k:'uq',l:'UQ'}].map(({k,l}) => (<button key={k} onClick={() => updCol(col.id, k, !col[k])} className={`text-[10px] font-bold px-1.5 py-1 rounded border leading-none transition ${col[k] ? BTN_STYLES[k] : 'bg-[#21262d] border-[#30363d] text-[#6e7681] hover:text-[#8b949e]'}`}>{l}</button>))}</div>
-            <button onClick={() => delCol(col.id)} className="text-[#6e7681] hover:text-[#f85149] p-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            <div className="flex gap-0.5">{[{k:'pk',l:'PK'},{k:'ai',l:'AI'},{k:'nn',l:'NN'},{k:'uq',l:'UQ'}].map(({k,l}) => (<button key={k} onClick={() => updCol(col.id, k, !col[k])} className={`text-[10px] font-bold px-1.5 py-1 rounded border leading-none ${col[k] ? BTN_STYLES[k] : 'bg-[#21262d] border-[#30363d] text-[#6e7681]'}`}>{l}</button>))}</div>
+            <button onClick={() => delCol(col.id)} className="text-[#6e7681]  p-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
           </div>
         ))}
-        <button onClick={addCol} className="flex items-center gap-1 text-[11px] text-[#6e7681] hover:text-[#58a6ff] border border-dashed border-[#30363d] hover:border-[#58a6ff]/50 rounded-lg px-3 py-2 transition shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Columna</button>
+        <button onClick={addCol} className="flex items-center gap-1 text-[11px] text-[#6e7681] border border-dashed border-[#30363d] rounded-lg px-3 py-2 shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Columna</button>
       </div>
     </div>
   );
@@ -820,12 +841,12 @@ function TableEditor({ table, onUpdateTable, onClose }) {
 
 function LayerPanel({ layers, tables, selectedTables, onAddLayer, onRemoveLayer, onUpdateLayer, onAssignSelected, onClose }) {
   return (
-    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 slide-in p-4 overflow-y-auto">
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 p-4 overflow-y-auto">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-[#e6edf3] flex items-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Capas</h3>
-        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1.5 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+        <button onClick={onClose} className="text-[#6e7681]  p-1.5 rounded-lg"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
       </div>
-      <button onClick={onAddLayer} className="w-full text-[11px] text-[#6e7681] hover:text-[#58a6ff] bg-[#0d1117] hover:bg-[#21262d] rounded-lg py-2 mb-4 transition border border-dashed border-[#30363d] hover:border-[#58a6ff]/50 flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Capa</button>
+      <button onClick={onAddLayer} className="w-full text-[11px] text-[#6e7681] bg-[#0d1117] rounded-lg py-2 mb-4 border border-dashed border-[#30363d] flex items-center justify-center gap-1.5"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Capa</button>
       {layers.length === 0 && <p className="text-[12px] text-[#6e7681] text-center py-6">No hay capas.</p>}
       {layers.map(layer => (
         <div key={layer.id} className="mb-3 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-hidden">
@@ -833,9 +854,9 @@ function LayerPanel({ layers, tables, selectedTables, onAddLayer, onRemoveLayer,
             <div className="w-4 h-4 rounded-full shrink-0" style={{ backgroundColor: layer.color }} />
             <input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} className="flex-1 bg-transparent text-[13px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white" />
             <span className="text-[11px] text-[#6e7681]">{layer.tableIds.length}</span>
-            <button onClick={e => { e.stopPropagation(); onRemoveLayer(layer.id); }} className="text-[#6e7681] hover:text-[#f85149] p-1 transition"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            <button onClick={e => { e.stopPropagation(); onRemoveLayer(layer.id); }} className="text-[#6e7681]  p-1"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
           </div>
-          {Object.keys(selectedTables).length > 0 && (<div className="px-3 pb-2.5"><button onClick={() => onAssignSelected(layer.id)} className="text-[10px] text-[#58a6ff] hover:text-[#79c0ff] bg-[#1f6feb]/10 hover:bg-[#1f6feb]/20 rounded px-2 py-1 transition w-full">+ Asignar {Object.keys(selectedTables).length} seleccionadas</button></div>)}
+          {Object.keys(selectedTables).length > 0 && (<div className="px-3 pb-2.5"><button onClick={() => onAssignSelected(layer.id)} className="text-[10px] text-[#58a6ff]  bg-[#1f6feb]/10  rounded px-2 py-1 w-full">+ Asignar {Object.keys(selectedTables).length} seleccionadas</button></div>)}
         </div>
       ))}
     </div>
