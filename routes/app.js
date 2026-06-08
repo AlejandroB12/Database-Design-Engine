@@ -87,7 +87,11 @@ function App() {
 
   const handleZoomOrPos = useCallback((tid, key, val) => {
     if (key === null && val === null) return;
-    if (tid === null && key === null) { setZoom(z => Math.max(0.25, Math.min(3, z + val))); return; }
+    if (tid === null && key === null) {
+      if (typeof val === 'number') { setZoom(z => Math.max(0.25, Math.min(3, z + val))); return; }
+      if (val && typeof val === 'object' && val.abs !== undefined) { setZoom(Math.max(0.25, Math.min(3, val.abs))); return; }
+      return;
+    }
     if (val === 'fit') {
       const vals = Object.values(positions);
       if (vals.length === 0) return;
@@ -164,23 +168,16 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-[#0d1117]">
-      <header className="bg-[#161b22]/80 border-b border-[#21262d]/50 px-5 py-2 flex items-center justify-between shrink-0">
+      <header className="bg-[#161b22]/80 border-b border-[#21262d]/50 px-5 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
-          <div className="bg-[#1f6feb]/20 rounded-lg p-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#58a6ff]">
+          <div className="bg-[#1f6feb]/20 rounded-lg p-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#58a6ff]">
               <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
           </div>
-          <h1 className="text-base font-bold text-[#c9d1d9]">DB Modeler</h1>
+          <h1 className="text-lg font-bold text-[#c9d1d9]">DB Modeler</h1>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-[#21262d]/80 rounded-lg border border-[#30363d]/50 overflow-hidden">
-            <button onClick={() => setLeftTab('sql')}
-              className={`tab-btn text-[11px] px-3 py-1.5 font-medium transition ${leftTab === 'sql' ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#6e7681] hover:text-[#c9d1d9]'}`}>
-              SQL
-            </button>
-          </div>
-
           <input ref={fileInputRef} type="file" accept=".sql" onChange={handleImportFile} className="hidden" />
           <button onClick={() => fileInputRef.current?.click()}
             className="text-[12px] text-[#6e7681] hover:text-[#3fb950] bg-[#21262d]/80 hover:bg-[#30363d] rounded-lg px-3 h-8 flex items-center transition border border-[#30363d]/50" title="Importar archivo SQL">
@@ -188,18 +185,9 @@ function App() {
             Importar SQL
           </button>
 
-          <button onClick={() => setShowLeft(s => !s)}
-            className="text-[12px] text-[#6e7681] hover:text-[#58a6ff] bg-[#21262d]/80 hover:bg-[#30363d] rounded-lg px-3 h-8 flex items-center transition border border-[#30363d]/50" title={showLeft ? 'Ocultar panel (Ctrl+B)' : 'Mostrar panel (Ctrl+B)'}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 shrink-0"><path d={showLeft ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} /></svg>
-            Panel
-          </button>
           {tables.length > 0 && <>
             <div className="w-px h-6 bg-[#30363d]/50 mx-1" />
             <div className="flex bg-[#21262d]/80 rounded-lg border border-[#30363d]/50 overflow-hidden">
-              <button data-export="svg" onClick={() => exportSVG(`diagrama-${Date.now()}.svg`)}
-                className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681] hover:text-[#d29922] transition flex items-center gap-1" title="Exportar SVG">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
               <button data-export="png" onClick={() => exportPNG(`diagrama-${Date.now()}.png`)}
                 className="tab-btn text-[11px] px-2.5 py-1.5 font-medium text-[#6e7681] hover:text-[#58a6ff] transition border-x border-[#30363d]/50 flex items-center gap-1" title="Exportar PNG">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -228,7 +216,6 @@ function App() {
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 shrink-0"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Capas {layers.length > 0 && <span className="ml-1 text-[10px] opacity-60">({layers.length})</span>}
           </button>}
-          {tables.length > 0 && (<span className="text-[12px] text-[#6e7681] bg-[#21262d]/80 rounded-full px-3 py-1 border border-[#30363d]/50">{tables.length} {tables.length === 1 ? 'tabla' : 'tablas'}</span>)}
           {error && <span className="text-[12px] text-[#f85149] bg-[#f85149]/10 rounded-full px-3 py-1">{error}</span>}
         </div>
       </header>
@@ -249,7 +236,8 @@ function App() {
           </svg>
         </button>
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {tables.length > 0 && (
+        <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
           <div className="flex-1 relative flex overflow-hidden">
             <div className="flex-1 relative diagram-container overflow-hidden">
               <Diagram
@@ -301,6 +289,7 @@ function App() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

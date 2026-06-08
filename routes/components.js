@@ -205,6 +205,29 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
 
   useEffect(() => { if (activeLayerId && !layers.find(l => l.id === activeLayerId)) setActiveLayerId(null); }, [layers, activeLayerId]);
 
+  const prevTableCount = useRef(0);
+  const fitToScreen = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const vals = Object.values(positions).filter(Boolean);
+    if (vals.length === 0) return;
+    const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
+    const maxX = Math.max(...vals.map(p => p.x + 310)), maxY = Math.max(...vals.map(p => {
+      const t = Object.values(tables).find(t => positions[t.id] === p);
+      return p.y + (t ? 40 + t.columns.length * 34 + 44 : 300);
+    }));
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const pad = 40;
+    const scale = Math.min((cw - pad) / (maxX - minX + 280), (ch - pad) / (maxY - minY + 200), 1.5);
+    const clamped = Math.max(0.25, Math.min(3, scale));
+    onUpdateTable(null, null, { abs: clamped });
+    setPan({ x: (cw - (maxX - minX) * clamped) / 2 - minX * clamped, y: (ch - (maxY - minY) * clamped) / 2 - minY * clamped });
+  }, [tables, positions, onUpdateTable]);
+  useEffect(() => {
+    if (tables.length > 0 && prevTableCount.current === 0) setTimeout(fitToScreen, 100);
+    prevTableCount.current = tables.length;
+  }, [tables, fitToScreen]);
+
   const fkInfo = useMemo(() => {
     const map = {};
     for (const t of tables) for (const ref of (t.refs || [])) map[`${t.id}-${ref.column}-${ref.refTable}`] = { tableId: t.id, column: ref.column, refTable: ref.refTable, refColumn: ref.refColumn, cardinality: ref.cardinality || 'M:1' };
@@ -676,6 +699,9 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             </svg>
           </button>
           <button onClick={() => onShowLayerPanel && onShowLayerPanel(true)} className="text-[#8b949e] hover:text-[#a371f7] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center transition" title="Capas"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></button>
+          <button onClick={fitToScreen} className="text-[#8b949e] hover:text-[#3fb950] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center transition" title="Ajustar al contenedor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
           <button onClick={() => onUpdateTable(null, null, -0.1)} className="text-[#8b949e] hover:text-[#c9d1d9] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold transition">-</button>
           <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
           <button onClick={() => onUpdateTable(null, null, 0.1)} className="text-[#8b949e] hover:text-[#c9d1d9] bg-[#30363d]/50 hover:bg-[#30363d] rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold transition">+</button>
@@ -703,10 +729,16 @@ function SqlEditor({ sql, onChange }) {
           <div className="sql-editor-wrapper w-full h-full">
             <pre ref={preRef} className="text-[14px] leading-relaxed font-sans" dangerouslySetInnerHTML={{ __html: html || '&nbsp;' }} />
             <textarea ref={textareaRef} value={sql} onChange={e => onChange(e.target.value)} onScroll={handleScroll}
-              placeholder="Pega tu SQL aquí... CREATE TABLE, ALTER TABLE, etc." className="text-[14px] leading-relaxed font-sans" spellCheck={false} wrap="soft" />
+              placeholder={`Pega o escribe tu código SQL aquí...\n\n✔ Soporta SQL estándar (CREATE TABLE, ALTER TABLE, INSERT, SELECT, etc.)\n✔ Compatible con sintaxis de PostgreSQL\n✔ También acepta MySQL, SQLite y otros dialectos\n✔ Las tablas y relaciones se generarán automáticamente`} className="text-[14px] leading-relaxed font-sans" spellCheck={false} wrap="soft" />
           </div>
         </div>
         <div className="absolute bottom-3 right-3 flex gap-1.5 z-10">
+          <button onClick={() => navigator.clipboard.writeText(sql)}
+            className="text-[11px] text-[#8b949e] hover:text-[#58a6ff] bg-[#21262d]/90 hover:bg-[#58a6ff]/20 border border-[#6e7681]/60 hover:border-[#58a6ff]/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium"
+            title="Copiar código SQL">Copiar</button>
+          <button onClick={async () => { const text = await navigator.clipboard.readText(); onChange(text); }}
+            className="text-[11px] text-[#8b949e] hover:text-[#d29922] bg-[#21262d]/90 hover:bg-[#d29922]/20 border border-[#6e7681]/60 hover:border-[#d29922]/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium"
+            title="Pegar código SQL">Pegar</button>
           <button onClick={() => onChange('')} className="text-[11px] text-[#8b949e] hover:text-[#f85149] bg-[#21262d]/90 hover:bg-[#f85149]/20 border border-[#6e7681]/60 hover:border-red-500/40 rounded-lg px-3 py-1.5 transition backdrop-blur font-medium">Limpiar</button>
         </div>
       </div>
