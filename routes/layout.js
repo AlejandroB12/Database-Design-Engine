@@ -102,7 +102,7 @@ function autoLayout(tables) {
     for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l]; if (l === 0) continue; names.sort((a, b) => { const pa = (graph[a]?.refs || []).filter(r => comp.includes(r))[0] || ''; const pb = (graph[b]?.refs || []).filter(r => comp.includes(r))[0] || ''; return (byLayer[l - 1] || []).indexOf(pa) - (byLayer[l - 1] || []).indexOf(pb); }); }
     let maxCols = 0; for (let l = 0; l <= maxLayer; l++) maxCols = Math.max(maxCols, (byLayer[l] || []).length);
     const compW = maxCols * colW - colGap; const compH = (maxLayer + 1) * rowH - rowGap;
-    const viewW = Math.max(800, window.innerWidth || 1200); const startX = Math.max(padX, (viewW - compW) / 2);
+    const viewW = 900; const startX = Math.max(padX, (viewW - compW) / 2);
     for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l] || []; const layerW = names.length * colW - colGap; const offsetX = startX + (compW - layerW) / 2; names.forEach((name, i) => { const id = byName[name]; if (id) positions[id] = { x: offsetX + i * colW, y: globalY + l * rowH }; }); }
     globalY += compH + 80;
   }
@@ -181,8 +181,7 @@ function arrangeTables(tables, positions) {
     for (let l = 0; l <= maxLayer; l++) {
       const names = byLayer[l] || [];
       const layerW = names.length * colGap;
-      const viewW = Math.max(800, window.innerWidth || 1200);
-      const startX = Math.max(60, (viewW - layerW) / 2);
+      const startX = Math.max(60, (900 - layerW) / 2);
       names.forEach((name, i) => {
         const id = byName[name];
         if (id) {
@@ -214,4 +213,82 @@ function arrangeTables(tables, positions) {
     }
   }
   return newPos;
+}
+
+function sortByName(tables) {
+  const sorted = [...tables].sort((a, b) => a.name.localeCompare(b.name));
+  const positions = {};
+  const cols = 4, gapX = 80, gapY = 100, startX = 60, startY = 30;
+  sorted.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
+}
+
+function sortByNameDesc(tables) {
+  const sorted = [...tables].sort((a, b) => b.name.localeCompare(a.name));
+  const positions = {};
+  const cols = 4, gapX = 80, gapY = 100, startX = 60, startY = 30;
+  sorted.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
+}
+
+function sortByColumns(tables, asc = true) {
+  const sorted = [...tables].sort((a, b) => asc ? a.columns.length - b.columns.length : b.columns.length - a.columns.length);
+  const positions = {};
+  const cols = 4, gapX = 80, gapY = 100, startX = 60, startY = 30;
+  sorted.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
+}
+
+function sortByCategory(tables, tableCategory, categories) {
+  const catOrder = categories.map(c => c.id);
+  const sorted = [...tables].sort((a, b) => {
+    const ca = tableCategory[a.id], cb = tableCategory[b.id];
+    if (ca && !cb) return -1;
+    if (!ca && cb) return 1;
+    if (ca && cb) return catOrder.indexOf(ca) - catOrder.indexOf(cb);
+    return a.name.localeCompare(b.name);
+  });
+  const positions = {};
+  const cols = 4, gapX = 80, gapY = 100, startX = 60, startY = 30;
+  sorted.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
+}
+
+function sortByColor(tables) {
+  const sorted = [...tables].sort((a, b) => (a.color || '#6366f1').localeCompare(b.color || '#6366f1'));
+  const positions = {};
+  const cols = 4, gapX = 80, gapY = 100, startX = 60, startY = 30;
+  sorted.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
+}
+
+function sortGrid(tables, cols = 3) {
+  const positions = {};
+  const gapX = 80, gapY = 100, startX = 60, startY = 30;
+  tables.forEach((t, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const h = 40 + t.columns.length * 34 + 44;
+    positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
+  });
+  return positions;
 }

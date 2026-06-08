@@ -22,6 +22,15 @@
     .diagram-container { cursor: grab; }
     .diagram-container.panning { cursor: grabbing; }
     .diagram-container .table-card { cursor: default; }
+    .diagram-pattern {
+      background-color: #d5dbdb;
+      background-image:
+        radial-gradient(circle at 20px 20px, rgba(255,255,255,0.6) 2px, transparent 2px),
+        radial-gradient(circle at 60px 60px, rgba(255,255,255,0.4) 3px, transparent 3px),
+        radial-gradient(circle at 100px 0px, rgba(189,195,199,0.3) 4px, transparent 4px),
+        radial-gradient(circle at 0px 80px, rgba(255,255,255,0.5) 2px, transparent 2px);
+      background-size: 140px 140px, 120px 120px, 160px 160px, 100px 100px;
+    }
     .sql-textarea { word-break: break-all; white-space: pre-wrap; }
     .sql-editor-wrapper { position: relative; }
     .sql-editor-wrapper textarea,
@@ -254,7 +263,7 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
   );
 });
 
-function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteTable, onUpdateTable, onPositionsChange, positions, zoom, layers, categories, tableCategory, linePaths, onUpdateLinePath, onResetLinePath, onSaveLinePathState, onUndoLinePath, onUpdateLayer, onRemoveLayer, onShowLayerPanel, onShowCategoryPanel, onUpdateRef, multiDragMode, onToggleMultiDrag, onSelectTables }) {
+function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteTable, onUpdateTable, onPositionsChange, positions, zoom, layers, categories, tableCategory, linePaths, onUpdateLinePath, onResetLinePath, onSaveLinePathState, onUndoLinePath, onUpdateLayer, onRemoveLayer, onShowLayerPanel, onShowCategoryPanel, onUpdateRef, multiDragMode, onToggleMultiDrag, onSelectTables, fitKey, showLeft }) {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const dragRef = useRef(null);
@@ -289,6 +298,8 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
   useEffect(() => { if (activeLayerId && !layers.find(l => l.id === activeLayerId)) setActiveLayerId(null); }, [layers, activeLayerId]);
 
   const prevTableCount = useRef(0);
+  const prevShowLeft = useRef(showLeft);
+  const prevFitKey = useRef(0);
   const fitToScreen = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -296,7 +307,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     if (vals.length === 0) return;
     const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
     const maxX = Math.max(...vals.map(p => p.x + 310)), maxY = Math.max(...vals.map(p => {
-      const t = Object.values(tables).find(t => positions[t.id] === p);
+      const t = tables.find(t => positions[t.id] === p);
       return p.y + (t ? 40 + t.columns.length * 34 + 44 : 300);
     }));
     const cw = container.clientWidth, ch = container.clientHeight;
@@ -306,10 +317,18 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     onUpdateTable(null, null, { abs: clamped });
     setPan({ x: (cw - (maxX - minX) * clamped) / 2 - minX * clamped, y: (ch - (maxY - minY) * clamped) / 2 - minY * clamped });
   }, [tables, positions, onUpdateTable]);
+
   useEffect(() => {
-    if (tables.length > 0 && prevTableCount.current === 0) setTimeout(fitToScreen, 100);
+    const isFirst = prevTableCount.current === 0 && tables.length > 0;
+    const fitKeyChanged = prevFitKey.current !== fitKey;
+    const leftChanged = prevShowLeft.current !== showLeft;
     prevTableCount.current = tables.length;
-  }, [tables, fitToScreen]);
+    prevFitKey.current = fitKey;
+    prevShowLeft.current = showLeft;
+    if (isFirst || fitKeyChanged || leftChanged) {
+      Promise.resolve().then(fitToScreen);
+    }
+  }, [tables, fitToScreen, fitKey, showLeft]);
 
   const fkInfo = useMemo(() => {
     const map = {};
@@ -667,15 +686,15 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
 
   return (
     <div ref={containerRef}
-      className={`diagram-container relative w-full h-full overflow-hidden bg-[#0d1117]/50 ${isPanning ? 'panning' : ''}`}
+      className={`diagram-container diagram-pattern relative w-full h-full overflow-hidden ${isPanning ? 'panning' : ''}`}
       onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}>
       <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
          <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible' }}>
           <defs>
-            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
-            <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
-            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
-            <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#6366f1" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#6366f1" strokeWidth="2.5" /></marker>
+            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#6366f1" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#6366f1" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#6366f1" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#6366f1" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#6366f1" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#6366f1" strokeWidth="2.5" /></marker>
             <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <filter id="layer-glow"><feGaussianBlur stdDeviation="20" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <filter id="layer-glow-inner"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
@@ -725,17 +744,17 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             return (
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" style={{ pointerEvents: 'none' }} />
-                <text x={l.startPos.x - 14} y={l.startPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.startLabel}</text>
-                <text x={l.endPos.x + 14} y={l.endPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.endLabel}</text>
+                <path d={pathStr} stroke="#6366f1" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
+                <path d={pathStr} stroke="#6366f1" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" style={{ pointerEvents: 'none' }} />
+                <text x={l.startPos.x - 14} y={l.startPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#6366f1" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.startLabel}</text>
+                <text x={l.endPos.x + 14} y={l.endPos.y - 10} textAnchor="middle" dominantBaseline="middle" fill="#6366f1" fontSize="9" fontWeight="bold" opacity={highlight ? 1 : 0.4} style={{ pointerEvents: 'none', userSelect: 'none' }}>{l.endLabel}</text>
                 {(isActive || isHovered) && l.points.map((p, pi) => {
                   const isEndpoint = pi === 0 || pi === l.points.length - 1;
                   return (
                     <g key={`h-${pi}`}>
                       <circle cx={p.x} cy={p.y} r={isEndpoint ? 6 : 8}
-                        fill={isEndpoint ? '#ffffff' : '#c4b5fd'}
-                        stroke={isEndpoint ? '#8b949e' : '#a371f7'}
+                        fill={isEndpoint ? '#6366f1' : '#c4b5fd'}
+                        stroke={isEndpoint ? '#4f46e5' : '#a371f7'}
                         strokeWidth={isEndpoint ? 2 : 2.5} opacity={1}
                         filter={!isEndpoint ? 'url(#glow)' : undefined}
                         style={{ cursor: isEndpoint ? 'grab' : 'grab', pointerEvents: 'all' }}
@@ -1127,6 +1146,81 @@ function CategoryPanel({ categories, tables, tableCategory, onAddCategory, onRem
     </div>
   );
 }
+
+function SortPanel({ tables, categories, tableCategory, onSort, onClose }) {
+  const [selectedSort, setSelectedSort] = useState(null);
+  const sortOptions = [
+    { id: 'name', label: 'Nombre (A-Z)', icon: '↓', desc: 'Orden alfabético ascendente' },
+    { id: 'nameDesc', label: 'Nombre (Z-A)', icon: '↑', desc: 'Orden alfabético descendente' },
+    { id: 'columnsAsc', label: 'Columnas (menor)', icon: '↓', desc: 'Menor cantidad de columnas primero' },
+    { id: 'columnsDesc', label: 'Columnas (mayor)', icon: '↑', desc: 'Mayor cantidad de columnas primero' },
+    { id: 'relationships', label: 'Relaciones', icon: '↗', desc: 'Organiza por grafo de relaciones' },
+    { id: 'category', label: 'Categoría', icon: '▦', desc: 'Agrupa por categoría' },
+    { id: 'color', label: 'Color', icon: '◉', desc: 'Agrupa por color de tabla' },
+    { id: 'grid3', label: 'Cuadrícula 3 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 3 columnas' },
+    { id: 'grid4', label: 'Cuadrícula 4 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 4 columnas' },
+    { id: 'grid5', label: 'Cuadrícula 5 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 5 columnas' },
+  ];
+  const handleSort = (id) => {
+    setSelectedSort(id);
+    onSort(id);
+  };
+  const formatDesc = (option) => {
+    if (option.id === 'category' && categories.length === 0) return 'No hay categorías definidas';
+    return option.desc;
+  };
+  return (
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d]/50">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#3fb950]/10 rounded-lg p-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#3fb950]">
+              <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+              <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+              <line x1="4" y1="4" x2="9" y2="9"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-[13px] font-semibold text-[#e6edf3] leading-tight">Ordenar</h3>
+            <p className="text-[11px] text-[#6e7681]">{tables.length} tablas</p>
+          </div>
+        </div>
+        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {sortOptions.map(opt => {
+          const disabled = opt.id === 'category' && categories.length === 0;
+          return (
+            <button key={opt.id} onClick={() => !disabled && handleSort(opt.id)}
+              className={`w-full text-left rounded-lg border transition-all ${selectedSort === opt.id
+                ? 'bg-[#3fb950]/15 border-[#3fb950]/40 text-[#e6edf3]'
+                : disabled
+                  ? 'bg-[#0d1117] border-[#30363d] text-[#484f58] cursor-not-allowed'
+                  : 'bg-[#0d1117] border-[#30363d] text-[#c9d1d9] hover:border-[#3fb950]/30 hover:bg-[#3fb950]/5'}`}>
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold ${selectedSort === opt.id ? 'bg-[#3fb950]/20 text-[#3fb950]' : 'bg-[#21262d] text-[#6e7681]'}`}>{opt.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[12px] font-medium ${disabled ? 'text-[#484f58]' : ''}`}>{opt.label}</div>
+                  <div className={`text-[10px] ${disabled ? 'text-[#30363d]' : 'text-[#6e7681]'}`}>{formatDesc(opt)}</div>
+                </div>
+                {selectedSort === opt.id && (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="p-3 border-t border-[#30363d]/50">
+        <p className="text-[10px] text-[#6e7681] text-center">
+          Selecciona un método de ordenamiento para reorganizar el diagrama
+        </p>
+      </div>
+    </div>
+  );
+}
   </script>
   <script type="text/babel">
 const { useState, useCallback, useMemo, useRef, useEffect } = React;
@@ -1147,6 +1241,8 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [tableCategory, setTableCategory] = useState({});
   const [showCategories, setShowCategories] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
+  const [sortFitKey, setSortFitKey] = useState(0);
   const parseTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -1205,6 +1301,27 @@ CREATE TABLE pedido_productos (
     setPositions(newPos);
     setLinePaths({});
   }, [tables, positions]);
+
+  const handleSort = useCallback((sortId) => {
+    if (tables.length === 0) return;
+    let newPos;
+    switch (sortId) {
+      case 'name': newPos = sortByName(tables); break;
+      case 'nameDesc': newPos = sortByNameDesc(tables); break;
+      case 'columnsAsc': newPos = sortByColumns(tables, true); break;
+      case 'columnsDesc': newPos = sortByColumns(tables, false); break;
+      case 'relationships': newPos = arrangeTables(tables, positions); break;
+      case 'category': newPos = sortByCategory(tables, tableCategory, categories); break;
+      case 'color': newPos = sortByColor(tables); break;
+      case 'grid3': newPos = sortGrid(tables, 3); break;
+      case 'grid4': newPos = sortGrid(tables, 4); break;
+      case 'grid5': newPos = sortGrid(tables, 5); break;
+      default: return;
+    }
+    setPositions(newPos);
+    setLinePaths({});
+    setSortFitKey(k => k + 1);
+  }, [tables, positions, tableCategory, categories]);
 
   const syncSqlToTables = useCallback((value) => {
     value = stripSQLComments(value); setSql(value); setError(null);
@@ -1391,9 +1508,9 @@ CREATE TABLE pedido_productos (
                 PDF
               </button>
             </div>
-            <button onClick={handleArrange}
-              className="text-[12px] font-medium text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 rounded-lg px-3 h-8 flex items-center border border-[#30363d]/50 gap-1.5 transition-colors"
-              title="Ordenar tablas automáticamente">
+            <button onClick={() => setShowSortPanel(s => !s)}
+              className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center border gap-1.5 transition-colors ${showSortPanel ? 'text-[#3fb950] bg-[#3fb950]/15 border-[#3fb950]/30' : 'text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 border-[#30363d]/50'}`}
+              title="Panel de ordenamiento">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
                 <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
@@ -1513,6 +1630,8 @@ CREATE TABLE pedido_productos (
                 multiDragMode={multiDragMode}
                 onToggleMultiDrag={() => setMultiDragMode(m => !m)}
                 onSelectTables={handleSelectTables}
+                fitKey={sortFitKey}
+                showLeft={showLeft}
               />
               {tables.length > 0 && showLayers && (
                 <LayerPanel
@@ -1533,6 +1652,15 @@ CREATE TABLE pedido_productos (
                   onUpdateCategory={updateCategory}
                   onSetTableCategory={setTableCategoryId}
                   onClose={() => setShowCategories(false)}
+                />
+              )}
+              {tables.length > 0 && showSortPanel && (
+                <SortPanel
+                  tables={tables}
+                  categories={categories}
+                  tableCategory={tableCategory}
+                  onSort={handleSort}
+                  onClose={() => setShowSortPanel(false)}
                 />
               )}
             </div>
