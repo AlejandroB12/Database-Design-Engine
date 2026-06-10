@@ -42,7 +42,7 @@
     .sql-comment { color: #8b949e; font-style: italic; }
     .sql-backtick { color: #79c0ff; }
     .sql-operator { color: #ff7b72; }
-    .table-card.dragging { z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    .table-card.dragging { z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08) !important; transform: translateY(-2px); }
     .diagram-svg { pointer-events: none; }
     .diagram-canvas { transform-origin: 0 0; }
     .diagram-svg line { cursor: pointer; }
@@ -202,13 +202,20 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
   const catColor = categories && categories.length > 0 ? categories[0].color : null;
   return (
     <div ref={ref}
-      className={`table-card absolute rounded-lg border overflow-hidden w-[310px]`}
+      className={`table-card absolute rounded-lg overflow-hidden w-[310px]`}
       style={{
-        left: position.x, top: position.y, background: '#161b22',
+        left: position.x, top: position.y,
+        background: 'linear-gradient(180deg, #1c2333 0%, #161b22 100%)',
+        border: '1px solid',
         borderColor: selected ? (catColor || c) + '80' : (catColor || '#30363d'),
         borderLeftWidth: catColor ? '4px' : '1px',
         borderLeftColor: catColor || (selected ? c + '80' : '#30363d'),
-        boxShadow: selected ? `0 0 0 1px ${catColor || c}80, 0 8px 24px rgba(0,0,0,0.4)` : '0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15)'
+        boxShadow: selected
+          ? `0 0 0 1px ${catColor || c}60, 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px ${catColor || c}30, inset 0 1px 0 rgba(255,255,255,0.06)`
+          : '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+        borderBottom: selected
+          ? `2px solid ${catColor || c}60`
+          : '2px solid #1a1f2e'
       }}
     >
       <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"

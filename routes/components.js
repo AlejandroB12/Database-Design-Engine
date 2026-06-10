@@ -140,8 +140,19 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
   const c = table.color || '#6366f1';
   return (
     <div ref={ref}
-      className={`table-card  absolute rounded-lg border overflow-hidden w-[310px]`}
-      style={{ left: position.x, top: position.y, background: '#161b22', borderColor: selected ? c + '80' : '#30363d', boxShadow: selected ? `0 0 0 1px ${c}80, 0 8px 24px rgba(0,0,0,0.4)` : '0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.15)' }}
+      className={`table-card absolute rounded-lg overflow-hidden w-[310px]`}
+      style={{
+        left: position.x, top: position.y,
+        background: 'linear-gradient(180deg, #1c2333 0%, #161b22 100%)',
+        border: '1px solid',
+        borderColor: selected ? c + '80' : '#30363d',
+        boxShadow: selected
+          ? `0 0 0 1px ${c}60, 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px ${c}30, inset 0 1px 0 rgba(255,255,255,0.06)`
+          : '0 4px 16px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+        borderBottom: selected
+          ? `2px solid ${c}60`
+          : '2px solid #1a1f2e'
+      }}
     >
       <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"
         style={{ background: `${c}15`, borderBottom: `1px solid ${c}25` }}

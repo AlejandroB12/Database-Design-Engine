@@ -1,3 +1,11 @@
+const EXPORT_SCALE = 2;
+
+let exportPending = false;
+
+function yieldToBrowser() {
+  return new Promise(resolve => setTimeout(resolve, 10));
+}
+
 function captureDiagram() {
   const canvas = document.querySelector('.diagram-canvas');
   if (!canvas) return Promise.reject('No se encontro el diagrama');
@@ -39,7 +47,7 @@ function captureDiagram() {
 
   return html2canvas(canvas, {
     backgroundColor: '#0d1117',
-    scale: 3,
+    scale: EXPORT_SCALE,
     useCORS: true,
     logging: false,
     width: contentW + pad * 2,
@@ -108,20 +116,35 @@ function captureDiagram() {
   });
 }
 
-function exportPNG(filename) {
+async function exportPNG(filename) {
+  if (exportPending) return;
   const btn = document.querySelector('[data-export="png"]');
-  if (btn) { btn.innerHTML = '...'; btn.disabled = true; }
+  if (btn) {
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = '...';
+    btn.disabled = true;
+  }
+  exportPending = true;
+  await yieldToBrowser();
   captureDiagram().then(canvas => {
     canvas.toBlob(blob => {
       downloadBlob(blob, filename || 'diagrama.png');
       restoreExportBtn(btn, 'png');
+      exportPending = false;
     }, 'image/png');
-  }).catch(() => restoreExportBtn(btn, 'png'));
+  }).catch(() => { restoreExportBtn(btn, 'png'); exportPending = false; });
 }
 
-function exportSVG(filename) {
+async function exportSVG(filename) {
+  if (exportPending) return;
   const btn = document.querySelector('[data-export="svg"]');
-  if (btn) { btn.innerHTML = '...'; btn.disabled = true; }
+  if (btn) {
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = '...';
+    btn.disabled = true;
+  }
+  exportPending = true;
+  await yieldToBrowser();
   captureDiagram().then(canvas => {
     const dataUrl = canvas.toDataURL('image/png');
     const w = canvas.width;
@@ -132,29 +155,43 @@ function exportSVG(filename) {
     const blob = new Blob([svgContent], { type: 'image/svg+xml' });
     downloadBlob(blob, filename || 'diagrama.svg');
     restoreExportBtn(btn, 'svg');
-  }).catch(() => restoreExportBtn(btn, 'svg'));
+    exportPending = false;
+  }).catch(() => { restoreExportBtn(btn, 'svg'); exportPending = false; });
 }
 
-function exportPDF(filename) {
+async function exportPDF(filename) {
+  if (exportPending) return;
   const btn = document.querySelector('[data-export="pdf"]');
-  if (btn) { btn.innerHTML = '...'; btn.disabled = true; }
+  if (btn) {
+    btn.dataset.originalHtml = btn.innerHTML;
+    btn.innerHTML = '...';
+    btn.disabled = true;
+  }
+  exportPending = true;
+  await yieldToBrowser();
   captureDiagram().then(canvas => {
     const imgData = canvas.toDataURL('image/png');
     const { jsPDF } = window.jspdf;
-    const w = canvas.width / 3;
-    const h = canvas.height / 3;
+    const w = canvas.width / EXPORT_SCALE;
+    const h = canvas.height / EXPORT_SCALE;
     const orientation = w > h ? 'landscape' : 'portrait';
     const pdf = new jsPDF({ orientation, unit: 'px', format: [w, h], compress: true });
     pdf.addImage(imgData, 'PNG', 0, 0, w, h, undefined, 'FAST');
     pdf.save(filename || 'diagrama.pdf');
     restoreExportBtn(btn, 'pdf');
-  }).catch(() => restoreExportBtn(btn, 'pdf'));
+    exportPending = false;
+  }).catch(() => { restoreExportBtn(btn, 'pdf'); exportPending = false; });
 }
 
 function restoreExportBtn(btn, type) {
   if (!btn) return;
-  const icons = { png: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', svg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>', pdf: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' };
-  btn.innerHTML = icons[type] || '';
+  if (btn.dataset.originalHtml) {
+    btn.innerHTML = btn.dataset.originalHtml;
+    delete btn.dataset.originalHtml;
+  } else {
+    const icons = { png: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', svg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>', pdf: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' };
+    btn.innerHTML = icons[type] || '';
+  }
   btn.disabled = false;
 }
 
