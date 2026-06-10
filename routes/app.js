@@ -179,7 +179,7 @@ function App() {
               <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
           </div>
-          <h1 className="text-lg font-bold text-[#c9d1d9]">DB Modeler</h1>
+          <h1 className="text-lg font-bold text-[#c9d1d9]">Database Modeler</h1>
         </div>
         <div className="flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept=".sql" onChange={handleImportFile} className="hidden" />
