@@ -38,7 +38,8 @@ function App() {
         if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setIsParsing(false); return; }
         const parsed = parseSQL(value);
         if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); setIsParsing(false); return; }
-        setPositions(autoLayout(parsed)); setTables(parsed); setSelectedTables({}); setError(null); setIsParsing(false);
+        const sorted = sortTablesByRelations(parsed);
+        setPositions(autoLayout(sorted)); setTables(sorted); setSelectedTables({}); setError(null); setIsParsing(false);
       } catch (e) { setError('Error: ' + e.message); setIsParsing(false); }
     }, 400);
   }, []);
@@ -172,7 +173,7 @@ function App() {
 
   return (
     <div className="h-screen flex flex-col bg-[#0d1117]">
-      <header className="bg-[#161b22]/80 border-b border-[#21262d]/50 px-5 py-3 flex items-center justify-between shrink-0">
+      <header className={`bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 ${tables.length > 0 ? 'border-b border-[#21262d]/50' : ''}`}>
         <div className="flex items-center gap-3">
           <div className="bg-[#1f6feb]/20 rounded-lg p-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#58a6ff]">
@@ -225,7 +226,7 @@ function App() {
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div className={`${showLeft ? 'w-[460px]' : 'w-0'} overflow-hidden shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30`}>
+        <div className={`${showLeft ? 'w-[460px]' : 'w-0'} overflow-hidden shrink-0 ${tables.length > 0 ? 'border-r border-[#21262d]/50' : ''} bg-[#161b22]/30`}>
           <div className="w-[460px] p-2.5 h-full flex flex-col">
             <div className="flex items-center gap-1 mb-2 shrink-0 border-b border-[#30363d]/40 pb-2.5">
               <button onClick={() => setLeftTab('sql')}
@@ -238,12 +239,6 @@ function App() {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                 DDL
               </button>
-              <div className="flex-1" />
-              {tables.length > 0 && (
-                <span className="text-[10px] text-[#6e7681] bg-[#21262d]/60 border border-[#30363d]/40 rounded-full px-2.5 py-0.5 font-medium">
-                  {tables.length} {tables.length === 1 ? 'tabla' : 'tablas'}
-                </span>
-              )}
               {isParsing && (
                 <span className="text-[10px] text-[#d29922] bg-[#d29922]/10 rounded-full px-2.5 py-0.5 font-medium flex items-center gap-1">
                   <svg className="" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
@@ -251,7 +246,7 @@ function App() {
                 </span>
               )}
             </div>
-            {leftTab === 'sql' && <SqlEditor sql={sql} onChange={syncSqlToTables} />}
+            {leftTab === 'sql' && <SqlEditor sql={sql} onChange={syncSqlToTables} tables={tables} />}
             {leftTab === 'ddl' && (
               <div className="h-full flex flex-col">
                 <div className="flex items-center gap-1.5 mb-2.5 shrink-0">
@@ -291,7 +286,6 @@ function App() {
           </svg>
         </button>
 
-        {tables.length > 0 && (
         <div className="flex-1 flex flex-col overflow-hidden ">
           <div className="flex-1 relative flex overflow-hidden">
             <div className="flex-1 relative diagram-container overflow-hidden">
@@ -344,7 +338,6 @@ function App() {
             </div>
           )}
         </div>
-        )}
       </div>
     </div>
   );

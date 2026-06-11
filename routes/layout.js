@@ -88,8 +88,8 @@ function autoLayout(tables) {
     while (queue.length) { const cur = queue.shift(); comp.push(cur); const g = graph[cur]; for (const n of [...g.refs, ...g.refdBy]) { if (!visited.has(n) && graph[n]) { visited.add(n); queue.push(n); } } }
     components.push(comp);
   }
-  const cardW = 310, cardH = 40 + 34; const padX = 60; const colGap = 50, rowGap = 60;
-  let globalY = 30; const colW = cardW + colGap; const rowH = cardH + rowGap;
+  const cardW = 310; const colGap = 50, rowGap = 80;
+  let globalY = 30;
   for (let ci = 0; ci < components.length; ci++) {
     const comp = components[ci];
     const roots = comp.filter(n => { const g = graph[n]; return !g || !g.refs.some(r => comp.includes(r)); });
@@ -99,11 +99,15 @@ function autoLayout(tables) {
     for (const n of comp) { if (layers[n] === undefined) layers[n] = 0; }
     const byLayer = {}; let maxLayer = 0;
     for (const n of comp) { const l = layers[n] || 0; if (!byLayer[l]) byLayer[l] = []; byLayer[l].push(n); maxLayer = Math.max(maxLayer, l); }
+    const tableHs = {};
+    for (const n of comp) { const t = tables.find(t => t.name === n); tableHs[n] = t ? 40 + t.columns.length * 34 + 44 : 200; }
+    const rowH = Math.max(rowGap + 74, ...comp.map(n => tableHs[n] + rowGap));
     for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l]; if (l === 0) continue; names.sort((a, b) => { const pa = (graph[a]?.refs || []).filter(r => comp.includes(r))[0] || ''; const pb = (graph[b]?.refs || []).filter(r => comp.includes(r))[0] || ''; return (byLayer[l - 1] || []).indexOf(pa) - (byLayer[l - 1] || []).indexOf(pb); }); }
     let maxCols = 0; for (let l = 0; l <= maxLayer; l++) maxCols = Math.max(maxCols, (byLayer[l] || []).length);
+    const colW = cardW + colGap;
     const compW = maxCols * colW - colGap; const compH = (maxLayer + 1) * rowH - rowGap;
-    const viewW = 900; const startX = Math.max(padX, (viewW - compW) / 2);
-    for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l] || []; const layerW = names.length * colW - colGap; const offsetX = startX + (compW - layerW) / 2; names.forEach((name, i) => { const id = byName[name]; if (id) positions[id] = { x: offsetX + i * colW, y: globalY + l * rowH }; }); }
+    const viewW = 900; const startX = Math.max(60, (viewW - compW) / 2);
+    for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l] || []; const layerW = names.length * colW - colGap; const offsetX = startX + (compW - layerW) / 2; names.forEach((name, i) => { const id = byName[name]; if (id) { const h = tableHs[name]; const yOff = (rowH - h) / 2; positions[id] = { x: offsetX + i * colW, y: globalY + l * rowH + yOff }; } }); }
     globalY += compH + 80;
   }
   return positions;
@@ -291,4 +295,44 @@ function sortGrid(tables, cols = 3) {
     positions[t.id] = { x: startX + col * (310 + gapX), y: startY + row * (h + gapY) };
   });
   return positions;
+}
+
+function sortTablesByRelations(tables) {
+  if (tables.length <= 1) return tables;
+  const byName = {}, refdBy = {}, inDegree = {};
+  for (const t of tables) { byName[t.name] = t; refdBy[t.name] = []; inDegree[t.name] = 0; }
+  for (const t of tables) {
+    for (const r of (t.refs || [])) {
+      if (byName[r.refTable]) { inDegree[t.name]++; refdBy[r.refTable].push(t.name); }
+    }
+  }
+  const level = {}, queue = [];
+  for (const t of tables) { if (inDegree[t.name] === 0) { queue.push(t.name); level[t.name] = 0; } }
+  const tempInDegree = { ...inDegree };
+  const byLevel = {};
+  while (queue.length) {
+    const name = queue.shift();
+    const l = level[name] || 0;
+    if (!byLevel[l]) byLevel[l] = [];
+    byLevel[l].push(name);
+    for (const child of refdBy[name]) {
+      tempInDegree[child]--;
+      if (tempInDegree[child] === 0) { level[child] = l + 1; queue.push(child); }
+    }
+  }
+  for (const t of tables) {
+    if (level[t.name] === undefined) {
+      const l = Math.max(...Object.keys(byLevel).map(Number), -1) + 1;
+      level[t.name] = l;
+      if (!byLevel[l]) byLevel[l] = [];
+      byLevel[l].push(t.name);
+    }
+  }
+  const result = [];
+  const maxL = Math.max(...Object.keys(byLevel).map(Number), 0);
+  for (let l = 0; l <= maxL; l++) {
+    const names = (byLevel[l] || []).sort((a, b) => a.localeCompare(b));
+    for (const name of names) result.push(byName[name]);
+  }
+  return result;
 }
