@@ -24,6 +24,10 @@
     .diagram-container .table-card { cursor: default; }
     .diagram-pattern {
       background-color: #0d1117;
+      background-image: url('Images/fondo.jpg');
+      background-size: cover;
+      background-position: center;
+      background-blend-mode: overlay;
     }
     .sql-textarea { word-break: break-all; white-space: pre-wrap; }
     .sql-editor-wrapper { position: relative; }
@@ -700,7 +704,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             <filter id="layer-glow"><feGaussianBlur stdDeviation="20" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <filter id="layer-glow-inner"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
-          <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="rgba(139, 148, 158, 0.03)" stroke="rgba(139, 148, 158, 0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />
+          <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="transparent" stroke="rgba(139, 148, 158, 0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />
           {(() => { const c = '#8b949e', o = 0.4, s = 24, g = 4, w = canvasBounds.width, h = canvasBounds.height; return (<g opacity={o} stroke={c} strokeWidth="2" fill="none" style={{ pointerEvents: 'none' }}><path d={`M${g},${g + s} L${g},${g} L${g + s},${g}`} /><path d={`M${w - g - s},${g} L${w - g},${g} L${w - g},${g + s}`} /><path d={`M${g},${h - g - s} L${g},${h - g} L${g + s},${h - g}`} /><path d={`M${w - g - s},${h - g} L${w - g},${h - g} L${w - g},${h - g - s}`} /></g>); })()}
           {selRect && (() => {
             const x = Math.min(selRect.startX, selRect.endX);
