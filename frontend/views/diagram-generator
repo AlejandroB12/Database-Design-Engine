@@ -72,16 +72,13 @@
       cursor: not-allowed;
     }
     @keyframes col-pulse {
-      0%, 100% { background-color: rgba(88, 166, 255, 0.08); border-left-color: rgba(88, 166, 255, 0.3); }
-      25% { background-color: rgba(88, 166, 255, 0.35); border-left-color: rgba(88, 166, 255, 1); }
-      50% { background-color: rgba(88, 166, 255, 0.25); border-left-color: rgba(88, 166, 255, 0.7); }
-      75% { background-color: rgba(88, 166, 255, 0.35); border-left-color: rgba(88, 166, 255, 1); }
+      0%, 100% { background-color: rgba(88, 166, 255, 0.06); border-left-color: rgba(88, 166, 255, 0.2); }
+      25% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
+      50% { background-color: rgba(88, 166, 255, 0.2); border-left-color: rgba(88, 166, 255, 0.6); }
+      75% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
     }
     .col-pulse {
       animation: col-pulse 1.2s ease-in-out 2;
-      border-left-width: 2px;
-      border-left-style: solid;
-      margin-left: -1px;
     }
   </style>
 </head>
@@ -209,9 +206,9 @@ function pointsToAngularPath(points) {
 }
 
 function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pulseFk }) {
-  const badge = col.pk ? 'bg-[#d29922]/20 text-[#d29922]' : col.fk ? 'bg-[#a371f7]/20 text-[#a371f7]' : col.uq ? 'bg-[#58a6ff]/20 text-[#58a6ff]' : 'bg-[#30363d]/40 text-[#8b949e]';
-  const label = col.pk ? 'PK' : col.fk ? 'FK' : col.uq ? 'UQ' : '';
   const typeColor = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+  const constraintMeta = col.pk ? { color: '#d29922', label: 'PK' } : col.uq ? { color: '#58a6ff', label: 'UQ' } : { color: null, label: '' };
+  const accentColor = col.pk ? '#d29922' : col.fk ? '#a371f7' : col.uq ? '#58a6ff' : null;
   const highlightKey = activeFk || hoveredFk;
   const isHighlight = highlightKey && (
     (fkInfo[highlightKey]?.tableId === tableId && fkInfo[highlightKey]?.column === col.name) ||
@@ -221,16 +218,50 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pul
     (fkInfo[pulseFk]?.tableId === tableId && fkInfo[pulseFk]?.column === col.name) ||
     (fkInfo[pulseFk]?.refTable === tableName && fkInfo[pulseFk]?.refColumn === col.name)
   );
-  const hlColor = '#ffffff';
-  const pulseCls = isPulsing && !highlightKey ? 'col-pulse border-l-[#58a6ff]' : '';
+  const pulseCls = isPulsing && !highlightKey ? 'col-pulse' : '';
+  const tc = typeColor[col.type] || '#8b949e';
   return (
-    <div className={`flex items-center gap-2 px-3 border-b border-[rgba(33,38,45,0.5)] last:border-b-0 ${isHighlight ? 'bg-[#1f6feb]/15 border-l-2 border-l-[#58a6ff] -ml-px' : pulseCls || 'hover:bg-[rgba(28,35,51,0.5)]'}`} style={{ height: 32 }}>
-      <span className="text-[10px] font-mono font-semibold px-1.5 rounded leading-none" style={{ color: isHighlight ? hlColor : (typeColor[col.type] || '#8b949e'), background: (isHighlight ? hlColor : (typeColor[col.type] || '#8b949e')) + '15', boxShadow: isHighlight ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>{col.type}</span>
-      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-[#e6edf3]' : 'text-[#c9d1d9]'}`}>{col.name}</span>
-      <div className="flex gap-1 shrink-0">
-        {label && <span className={`text-[10px] font-semibold px-1.5 rounded ${isHighlight ? 'bg-white/20 text-white' : badge}`}>{label}</span>}
-        {col.nn && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#f85149]/70'}`}>NN</span>}
-        {col.ai && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#3fb950]/70'}`}>AI</span>}
+    <div className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${isHighlight ? 'bg-[#1f6feb]/12' : pulseCls || 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
+      style={{ height: 34, borderLeft: accentColor ? `2px solid ${accentColor}60` : '2px solid transparent' }}>
+      <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
+        style={{
+          color: isHighlight ? '#ffffff' : tc,
+          background: isHighlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
+          border: `1px solid ${isHighlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
+          boxShadow: isHighlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
+        }}>{col.type}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {constraintMeta.label && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: constraintMeta.color,
+              background: `${constraintMeta.color}18`,
+              border: `1px solid ${constraintMeta.color}35`
+            }}>{constraintMeta.label}</span>
+        )}
+        {col.fk && !col.pk && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: '#a371f7',
+              background: '#a371f718',
+              border: '1px solid #a371f735'
+            }}>FK</span>
+        )}
+        {col.nn && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }} />
+            NN
+          </span>
+        )}
+        {col.ai && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }} />
+            AI
+          </span>
+        )}
       </div>
     </div>
   );
@@ -259,12 +290,12 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
           : `2px solid ${catColor || c}30`
       }}
     >
-      <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"
-        style={{ background: catColor ? `linear-gradient(180deg, ${catColor}35, ${catColor}08)` : `linear-gradient(180deg, ${c}35, ${c}08)`, borderBottom: `1px solid ${catColor || c}40` }}
+      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none"
+        style={{ background: catColor ? `linear-gradient(180deg, ${catColor}25, ${catColor}05)` : `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${catColor || c}35` }}
         onMouseDown={(e) => onDragStart(e, table.id)}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 6px ${c}60` }} />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-[10px] h-[10px] rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}50` }} />
           <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{table.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
           {categories && categories.length > 0 && (
             <div className="flex gap-1 ml-1">
@@ -788,8 +819,9 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             return (
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseFk(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseFk(null), 2400); }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" style={{ pointerEvents: 'none' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease, stroke-width 0.25s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={3.5} strokeLinecap="butt" strokeLinejoin="miter" fill="none" filter="url(#glow)" opacity={highlight ? 0.7 : 0} style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease, stroke-width 0.25s ease' }} />
 
                 {(isActive || isHovered) && l.points.map((p, pi) => {
                   const isEndpoint = pi === 0 || pi === l.points.length - 1;

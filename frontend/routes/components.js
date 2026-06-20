@@ -118,9 +118,9 @@ function pointsToAngularPath(points) {
 }
 
 function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pulseFk }) {
-  const badge = col.pk ? 'bg-[#d29922]/20 text-[#d29922]' : col.fk ? 'bg-[#a371f7]/20 text-[#a371f7]' : col.uq ? 'bg-[#58a6ff]/20 text-[#58a6ff]' : 'bg-[#30363d]/40 text-[#8b949e]';
-  const label = col.pk ? 'PK' : col.fk ? 'FK' : col.uq ? 'UQ' : '';
   const typeColor = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+  const constraintMeta = col.pk ? { color: '#d29922', label: 'PK' } : col.uq ? { color: '#58a6ff', label: 'UQ' } : { color: null, label: '' };
+  const accentColor = col.pk ? '#d29922' : col.fk ? '#a371f7' : col.uq ? '#58a6ff' : null;
   const highlightKey = activeFk || hoveredFk;
   const isHighlight = highlightKey && (
     (fkInfo[highlightKey]?.tableId === tableId && fkInfo[highlightKey]?.column === col.name) ||
@@ -130,16 +130,50 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pul
     (fkInfo[pulseFk]?.tableId === tableId && fkInfo[pulseFk]?.column === col.name) ||
     (fkInfo[pulseFk]?.refTable === tableName && fkInfo[pulseFk]?.refColumn === col.name)
   );
-  const hlColor = '#ffffff';
-  const pulseCls = isPulsing && !highlightKey ? 'col-pulse border-l-[#58a6ff]' : '';
+  const pulseCls = isPulsing && !highlightKey ? 'col-pulse' : '';
+  const tc = typeColor[col.type] || '#8b949e';
   return (
-    <div className={`flex items-center gap-2 px-3 border-b border-[rgba(33,38,45,0.5)] last:border-b-0 ${isHighlight ? 'bg-[#1f6feb]/15 border-l-2 border-l-[#58a6ff] -ml-px' : pulseCls || 'hover:bg-[rgba(28,35,51,0.5)]'}`} style={{ height: 32 }}>
-      <span className="text-[10px] font-mono font-semibold px-1.5 rounded leading-none" style={{ color: isHighlight ? hlColor : (typeColor[col.type] || '#8b949e'), background: (isHighlight ? hlColor : (typeColor[col.type] || '#8b949e')) + '15', boxShadow: isHighlight ? 'none' : 'inset 0 1px 0 rgba(255,255,255,0.06)' }}>{col.type}</span>
-      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-[#e6edf3]' : 'text-[#c9d1d9]'}`}>{col.name}</span>
-      <div className="flex gap-1 shrink-0">
-        {label && <span className={`text-[10px] font-semibold px-1.5 rounded ${isHighlight ? 'bg-white/20 text-white' : badge}`}>{label}</span>}
-        {col.nn && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#f85149]/70'}`}>NN</span>}
-        {col.ai && <span className={`text-[10px] font-semibold ${isHighlight ? 'text-white/70' : 'text-[#3fb950]/70'}`}>AI</span>}
+    <div className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${isHighlight ? 'bg-[#1f6feb]/12' : pulseCls || 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
+      style={{ height: 34, borderLeft: accentColor ? `2px solid ${accentColor}60` : '2px solid transparent' }}>
+      <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
+        style={{
+          color: isHighlight ? '#ffffff' : tc,
+          background: isHighlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
+          border: `1px solid ${isHighlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
+          boxShadow: isHighlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
+        }}>{col.type}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {constraintMeta.label && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: constraintMeta.color,
+              background: `${constraintMeta.color}18`,
+              border: `1px solid ${constraintMeta.color}35`
+            }}>{constraintMeta.label}</span>
+        )}
+        {col.fk && !col.pk && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: '#a371f7',
+              background: '#a371f718',
+              border: '1px solid #a371f735'
+            }}>FK</span>
+        )}
+        {col.nn && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }} />
+            NN
+          </span>
+        )}
+        {col.ai && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }} />
+            AI
+          </span>
+        )}
       </div>
     </div>
   );
@@ -147,6 +181,7 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pul
 
 const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDragStart, onDeleteTable, onAddColumn, activeFk, hoveredFk, fkInfo, categories, pulseFk }, ref) => {
   const c = table.color || '#6366f1';
+  const catColor = categories && categories.length > 0 ? categories[0].color : null;
   return (
     <div ref={ref}
       className={`table-card absolute rounded-lg overflow-hidden w-[310px]`}
@@ -156,22 +191,23 @@ const TableNode = React.forwardRef(({ table, position, selected, onSelect, onDra
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         border: '1px solid',
-        borderColor: selected ? c + '99' : 'rgba(48,54,61,0.6)',
-        borderLeft: `3px solid ${c + (selected ? 'cc' : '80')}`,
+        borderColor: selected ? (catColor || c) + '99' : 'rgba(48,54,61,0.6)',
+        borderLeftWidth: catColor ? '4px' : '3px',
+        borderLeftColor: catColor || c + (selected ? 'cc' : '80'),
         boxShadow: selected
-          ? `0 0 0 1px ${c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)`
+          ? `0 0 0 1px ${catColor || c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)`
           : '0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
         borderBottom: selected
-          ? `2px solid ${c}80`
-          : `2px solid ${c}30`
+          ? `2px solid ${catColor || c}80`
+          : `2px solid ${catColor || c}30`
       }}
     >
-      <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none"
-        style={{ background: `linear-gradient(180deg, ${c}35, ${c}08)`, borderBottom: `1px solid ${c}40` }}
+      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none"
+        style={{ background: catColor ? `linear-gradient(180deg, ${catColor}25, ${catColor}05)` : `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${catColor || c}35` }}
         onMouseDown={(e) => onDragStart(e, table.id)}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 6px ${c}60` }} />
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-[10px] h-[10px] rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}50` }} />
           <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{table.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
         </div>
         <div className="flex items-center gap-1 shrink-0">
