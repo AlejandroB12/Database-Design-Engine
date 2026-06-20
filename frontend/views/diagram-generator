@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Database Modeler</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="lib/tailwind.js"></script>
+  <script src="lib/react.production.min.js"></script>
+  <script src="lib/react-dom.production.min.js"></script>
+  <script src="lib/babel.min.js"></script>
+  <script src="lib/jspdf.umd.min.js"></script>
+  <script src="lib/html2canvas.min.js"></script>
   <style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -1271,6 +1271,32 @@ function App() {
 
   const issues = useMemo(() => detectIssues(tables, positions), [tables, positions]);
 
+  const syncSqlToTables = useCallback((value) => {
+    value = stripSQLComments(value); setSql(value); setError(null);
+    if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
+    parseTimeoutRef.current = setTimeout(() => {
+      try {
+        if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setTableCategory({}); return; }
+        const parsed = parseSQL(value);
+        if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); return; }
+        const sorted = sortTablesByRelations(parsed); setPositions(autoLayout(sorted)); setTables(sorted); setSelectedTables({}); setError(null);
+      } catch (e) { setError('Error: ' + e.message); }
+    }, 400);
+  }, []);
+
+  useEffect(() => { return () => { if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current); }; }, []);
+
+  const handleImportFile = useCallback((e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      syncSqlToTables(ev.target.result);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, [syncSqlToTables]);
+
   const handleLoadDemo = useCallback(() => {
     const demo = `CREATE TABLE clientes (
   id INT PRIMARY KEY AUTO_INCREMENT,
@@ -1318,6 +1344,11 @@ CREATE TABLE pedido_productos (
     setShowLeft(true);
   }, [syncSqlToTables]);
 
+  useEffect(() => {
+    const handler = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setShowLeft(s => !s); } };
+    window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   const handleArrange = useCallback(() => {
     if (tables.length === 0) return;
     const newPos = arrangeTables(tables, positions);
@@ -1345,37 +1376,6 @@ CREATE TABLE pedido_productos (
     setLinePaths({});
     setSortFitKey(k => k + 1);
   }, [tables, positions, tableCategory, categories]);
-
-  const syncSqlToTables = useCallback((value) => {
-    value = stripSQLComments(value); setSql(value); setError(null);
-    if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
-    parseTimeoutRef.current = setTimeout(() => {
-      try {
-        if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setTableCategory({}); return; }
-        const parsed = parseSQL(value);
-        if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); return; }
-        const sorted = sortTablesByRelations(parsed); setPositions(autoLayout(sorted)); setTables(sorted); setSelectedTables({}); setError(null);
-      } catch (e) { setError('Error: ' + e.message); }
-    }, 400);
-  }, []);
-
-  useEffect(() => { return () => { if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current); }; }, []);
-
-  useEffect(() => {
-    const handler = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setShowLeft(s => !s); } };
-    window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler);
-  }, []);
-
-  const handleImportFile = useCallback((e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function (ev) {
-      syncSqlToTables(ev.target.result);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  }, [syncSqlToTables]);
 
   const commitTables = useCallback((nextTables) => {
     setTables(nextTables);
