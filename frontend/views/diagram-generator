@@ -53,6 +53,24 @@
     .method-badge { font-family: 'SF Mono', 'Fira Code', monospace; }
     .tab-btn {}
     .sql-out { word-break: break-all; white-space: pre-wrap; }
+    button {
+      position: relative;
+      box-shadow: 0 2px 0 rgba(13,17,23,0.6), 0 4px 8px rgba(0,0,0,0.3);
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateY(0);
+    }
+    button:hover:not(:disabled) {
+      box-shadow: 0 3px 0 rgba(13,17,23,0.6), 0 6px 14px rgba(0,0,0,0.45);
+      transform: translateY(-1px);
+    }
+    button:active:not(:disabled) {
+      box-shadow: 0 1px 0 rgba(13,17,23,0.6), 0 2px 4px rgba(0,0,0,0.25);
+      transform: translateY(1px);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     @keyframes col-pulse {
       0%, 100% { background-color: rgba(88, 166, 255, 0.08); border-left-color: rgba(88, 166, 255, 0.3); }
       25% { background-color: rgba(88, 166, 255, 0.35); border-left-color: rgba(88, 166, 255, 1); }

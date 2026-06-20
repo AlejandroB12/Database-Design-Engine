@@ -1,5 +1,9 @@
 const { useState, useCallback, useMemo, useRef, useEffect } = React;
 
+const _btnStyle = document.createElement('style');
+_btnStyle.textContent = 'button{position:relative;box-shadow:0 2px 0 rgba(13,17,23,0.6),0 4px 8px rgba(0,0,0,0.3);transition:all .12s cubic-bezier(.4,0,.2,1);transform:translateY(0)}button:hover:not(:disabled){box-shadow:0 3px 0 rgba(13,17,23,0.6),0 6px 14px rgba(0,0,0,0.45);transform:translateY(-1px)}button:active:not(:disabled){box-shadow:0 1px 0 rgba(13,17,23,0.6),0 2px 4px rgba(0,0,0,0.25);transform:translateY(1px)}button:disabled{opacity:.5;cursor:not-allowed}';
+document.head.appendChild(_btnStyle);
+
 function midpoint(p1, p2) { return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; }
 
 function closestOnRect(px, py, rx, ry, rw, rh) {

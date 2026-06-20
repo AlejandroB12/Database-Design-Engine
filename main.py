@@ -11,7 +11,7 @@ app.mount("/images", StaticFiles(directory="assents/images"), name="images")
 
 @app.get("/")
 async def index():
-    return FileResponse("frontend/views/diagram-generator")
+    return FileResponse("frontend/views/diagram-generator", media_type="text/html")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
