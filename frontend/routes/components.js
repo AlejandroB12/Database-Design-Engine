@@ -648,7 +648,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
       className={`diagram-container relative w-full h-full overflow-hidden bg-[#0d1117]/50 ${isPanning ? 'panning' : ''}`}
       onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}>
       <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
-         <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible', zIndex: 5 }}>
+         <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible', zIndex: 0 }}>
           <defs>
             <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
             <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
