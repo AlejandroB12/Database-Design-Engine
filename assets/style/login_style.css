@@ -63,6 +63,7 @@ a { text-decoration: none; }
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 3rem;
+  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .brand-icon svg {
@@ -86,13 +87,41 @@ a { text-decoration: none; }
   line-height: 1.2;
   letter-spacing: -0.03em;
   margin-bottom: 1rem;
+  opacity: 0;
+  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.2s;
 }
 
 .brand p {
   color: #6e7681;
   font-size: 1.05rem;
-  line-height: 1.6;
-  max-width: 28rem;
+  line-height: 1.7;
+  max-width: 36rem;
+  opacity: 0;
+  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.5s;
+}
+
+@keyframes textReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes diagramReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.93);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 
@@ -100,6 +129,9 @@ a { text-decoration: none; }
   position: relative;
   z-index: 1;
   text-align: center;
+  opacity: 0;
+  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 1.6s;
 }
 
 .left-footer p {
@@ -398,7 +430,12 @@ a { text-decoration: none; }
   width: 100%;
   flex: 1;
   display: flex;
+  align-items: center;
+  justify-content: center;
   min-height: 0;
+  opacity: 0;
+  animation: diagramReveal 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.9s;
 }
 
 .diagram-svg {
@@ -428,11 +465,20 @@ a { text-decoration: none; }
   filter: url(#glowTable);
 }
 
-.conn-flow {
-  stroke-dasharray: 8 6;
-  animation: dbFlow 0.8s linear infinite;
+.hex-flow {
+  stroke-dasharray: 12 8;
+  animation: hexFlow 0.6s linear infinite;
 }
 
-@keyframes dbFlow {
-  to { stroke-dashoffset: -14; }
+.hex-glow {
+  animation: hexGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes hexFlow {
+  to { stroke-dashoffset: -20; }
+}
+
+@keyframes hexGlow {
+  0%, 100% { opacity: 0.06; }
+  50% { opacity: 0.2; }
 }
