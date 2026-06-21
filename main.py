@@ -7,11 +7,17 @@ app = FastAPI(title="Database Modeler")
 
 app.mount("/lib", StaticFiles(directory="frontend/lib"), name="lib")
 app.mount("/routes", StaticFiles(directory="frontend/routes"), name="routes")
-app.mount("/images", StaticFiles(directory="assents/images"), name="images")
+app.mount("/assets", StaticFiles(directory="assets"), name="assets")
+app.mount("/images", StaticFiles(directory="assets/images"), name="images")
 
-@app.get("/")
+@app.get("/generador")
 async def index():
     return FileResponse("frontend/views/diagram-generator", media_type="text/html")
+
+@app.get("/login")
+async def login():
+    return FileResponse("frontend/views/login.html", media_type="text/html")
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
