@@ -1,4 +1,5 @@
 const EXPORT_SCALE = 2;
+const PAD = 60;
 
 let exportPending = false;
 
@@ -6,189 +7,641 @@ function yieldToBrowser() {
   return new Promise(resolve => setTimeout(resolve, 10));
 }
 
-function captureDiagram() {
+function showLoadingOverlay() {
+  let el = document.getElementById('export-loading');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'export-loading';
+    el.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(13,17,23,0.7);backdrop-filter:blur(4px)';
+    el.innerHTML = '<div style="background:#21262d;border:1px solid #30363d;border-radius:12px;padding:24px 32px;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,0.5)"><div style="width:32px;height:32px;border:3px solid #30363d;border-top-color:#58a6ff;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px"></div><div style="color:#c9d1d9;font-size:14px;font-family:sans-serif">Exportando diagrama...</div></div>';
+    const s = document.createElement('style');
+    s.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+    el.appendChild(s);
+    document.body.appendChild(el);
+  }
+  el.style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+  const el = document.getElementById('export-loading');
+  if (el) el.style.display = 'none';
+}
+
+function computeBounds() {
   const canvas = document.querySelector('.diagram-canvas');
-  if (!canvas) return Promise.reject('No se encontro el diagrama');
-  const pad = 80;
+  if (!canvas) return null;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  const allCards = canvas.querySelectorAll('.table-card');
-  if (allCards.length > 0) {
-    allCards.forEach(el => {
-      const left = parseFloat(el.style.left) || 0;
-      const top = parseFloat(el.style.top) || 0;
-      const w = 310;
-      const h = el.offsetHeight || 200;
-      minX = Math.min(minX, left);
-      minY = Math.min(minY, top);
-      maxX = Math.max(maxX, left + w);
-      maxY = Math.max(maxY, top + h);
+  canvas.querySelectorAll('.table-card').forEach(el => {
+    const l = parseFloat(el.style.left) || 0;
+    const t = parseFloat(el.style.top) || 0;
+    const w = el.offsetWidth || 310;
+    const h = el.offsetHeight || 100;
+    minX = Math.min(minX, l);
+    minY = Math.min(minY, t);
+    maxX = Math.max(maxX, l + w);
+    maxY = Math.max(maxY, t + h);
+  });
+  const svg = canvas.querySelector('.diagram-svg');
+  if (svg) {
+    svg.querySelectorAll('path').forEach(p => {
+      try {
+        const bb = p.getBBox();
+        if ((bb.width > 0 || bb.height > 0) && bb.width < 2000 && bb.height < 2000) {
+          minX = Math.min(minX, bb.x);
+          minY = Math.min(minY, bb.y);
+          maxX = Math.max(maxX, bb.x + bb.width);
+          maxY = Math.max(maxY, bb.y + bb.height);
+        }
+      } catch (e) {}
     });
-    const svgEl = canvas.querySelector('.diagram-svg');
-    if (svgEl) {
-      svgEl.querySelectorAll('path').forEach(path => {
-        try {
-          const bbox = path.getBBox();
-          if (bbox.width > 0 || bbox.height > 0) {
-            minX = Math.min(minX, bbox.x);
-            minY = Math.min(minY, bbox.y);
-            maxX = Math.max(maxX, bbox.x + bbox.width);
-            maxY = Math.max(maxY, bbox.y + bbox.height);
-          }
-        } catch (e) {}
+  }
+  if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 1200, maxY: 800, w: 1200, h: 800 };
+  return { minX, minY, maxX, maxY, w: maxX - minX + PAD * 2, h: maxY - minY + PAD * 2 };
+}
+
+function getCardData(card) {
+  const left = parseFloat(card.style.left) || 0;
+  const top = parseFloat(card.style.top) || 0;
+  const w = card.offsetWidth || 310;
+  const h = card.offsetHeight || 200;
+
+  const header = card.querySelector('.cursor-grab');
+  const headerText = header ? header.querySelector('h3') : null;
+  const tableName = headerText ? headerText.textContent : 'sin nombre';
+  const colCount = card.querySelectorAll('[data-col-badge="true"]').length;
+
+  const colorEl = header ? header.querySelector('.rounded-sm') : null;
+  let tableColor = '#6366f1';
+  if (colorEl && colorEl.style.backgroundColor) {
+    tableColor = rgbToHex(colorEl.style.backgroundColor);
+  }
+
+  const headerH = header ? header.offsetHeight || 36 : 36;
+
+  const colBadges = Array.from(card.querySelectorAll('[data-col-badge="true"]'));
+  const columns = colBadges.map(el => {
+    const spans = el.querySelectorAll('span');
+    const typeEl = spans[0];
+    const nameEl = spans[1];
+    const type = typeEl ? typeEl.textContent.trim() : '';
+    const name = nameEl ? nameEl.textContent.trim() : '';
+    let isPk = false, isFk = false, isUq = false, isNn = false, isAi = false;
+    const constraintDiv = el.querySelector('[class*="shrink-0"]');
+    if (constraintDiv) {
+      constraintDiv.childNodes.forEach(node => {
+        if (node.nodeType === 1) {
+          const t = node.textContent.trim();
+          if (t === 'PK') isPk = true;
+          if (t === 'FK') isFk = true;
+          if (t === 'UQ') isUq = true;
+          if (t === 'NN') isNn = true;
+          if (t === 'AI') isAi = true;
+        }
       });
+    }
+    const hasAccent = isPk || isFk || isUq;
+    let accentColor = null;
+    if (isPk) accentColor = '#d29922';
+    else if (isFk) accentColor = '#a371f7';
+    else if (isUq) accentColor = '#58a6ff';
+    let typeColor = '#8b949e';
+    const typeColorMap = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+    if (typeColorMap[type]) typeColor = typeColorMap[type];
+    return { type, name, isPk, isFk, isUq, isNn, isAi, hasAccent, accentColor, typeColor, offsetY: el.offsetTop };
+  });
+
+  return { left, top, w, h, tableName, colCount, tableColor, columns, headerH };
+}
+
+function rgbToHex(rgb) {
+  if (!rgb) return '#6366f1';
+  const m = rgb.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return rgb;
+  return '#' + [m[1], m[2], m[3]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
+}
+
+function drawCard(ctx, data) {
+  const { left, top, w, h, tableName, colCount, tableColor, columns } = data;
+  const x = left, y = top;
+  const r = 8;
+
+  // Shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 8;
+  ctx.shadowOffsetX = 0;
+
+  // Card background
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
+  grad.addColorStop(0, 'rgba(22,27,34,0.88)');
+  grad.addColorStop(1, 'rgba(13,17,23,0.94)');
+  ctx.fillStyle = grad;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.fill();
+  ctx.restore();
+
+  // Border
+  ctx.save();
+  ctx.strokeStyle = 'rgba(48,54,61,0.6)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, x, y, w, h, r);
+  ctx.stroke();
+  ctx.restore();
+
+  // Left accent border
+  ctx.save();
+  ctx.fillStyle = tableColor + '80';
+  roundRect(ctx, x + 1, y + 12, 3, h - 24, 1.5);
+  ctx.fill();
+  ctx.restore();
+
+  // Bottom accent line
+  ctx.save();
+  ctx.fillStyle = tableColor + '30';
+  ctx.fillRect(x + 1, y + h - 2, w - 2, 2);
+  ctx.restore();
+
+  // Header gradient
+  const hdrH = data.headerH;
+  const hdrGrad = ctx.createLinearGradient(x, y, x, y + hdrH);
+  hdrGrad.addColorStop(0, tableColor + '25');
+  hdrGrad.addColorStop(1, tableColor + '05');
+  ctx.save();
+  ctx.fillStyle = hdrGrad;
+  roundRect(ctx, x, y, w, hdrH, { tl: r, tr: r, bl: 0, br: 0 });
+  ctx.fill();
+  ctx.restore();
+
+  // Header bottom line
+  ctx.save();
+  ctx.strokeStyle = tableColor + '35';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x, y + hdrH);
+  ctx.lineTo(x + w, y + hdrH);
+  ctx.stroke();
+  ctx.restore();
+
+  // Color indicator dot
+  ctx.save();
+  ctx.shadowColor = tableColor + '50';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = tableColor;
+  roundRect(ctx, x + 14, y + (hdrH - 10) / 2, 10, 10, 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Table name
+  ctx.save();
+  ctx.fillStyle = '#e6edf3';
+  ctx.font = '600 14px "Segoe UI", system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  const nameX = x + 30;
+  const nameMaxW = w - 110;
+  const displayName = truncateText(tableName, ctx, nameMaxW);
+  ctx.fillText(displayName, nameX, y + hdrH / 2);
+  ctx.restore();
+
+  // Column count
+  ctx.save();
+  ctx.fillStyle = '#6e7681';
+  ctx.font = '500 11px "Segoe UI", system-ui, sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right';
+  ctx.fillText(colCount + ' col.', x + w - 14, y + hdrH / 2);
+  ctx.restore();
+
+  // Columns
+  for (let ci = 0; ci < columns.length; ci++) {
+    const col = columns[ci];
+    const cy = y + col.offsetY;
+    const isLast = ci === columns.length - 1;
+
+    // Row background
+    ctx.save();
+    ctx.fillStyle = 'rgba(13,17,23,0.3)';
+    ctx.fillRect(x + 1, cy, w - 2, 34);
+    ctx.restore();
+
+    // Bottom border (not on last)
+    if (!isLast) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(33,38,45,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, cy + 34);
+      ctx.lineTo(x + w, cy + 34);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Left accent
+    if (col.hasAccent && col.accentColor) {
+      ctx.save();
+      ctx.fillStyle = col.accentColor + '60';
+      ctx.fillRect(x + 1, cy + 1, 2, 32);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.fillStyle = 'transparent';
+      ctx.fillRect(x + 1, cy + 1, 2, 32);
+      ctx.restore();
+    }
+
+    // Type badge
+    const badgeX = x + 16;
+    const badgeText = col.type;
+    ctx.save();
+    ctx.font = '600 10px "Consolas", "Courier New", monospace';
+    const badgeW = ctx.measureText(badgeText).width + 16;
+    ctx.fillStyle = col.typeColor + '12';
+    roundRect(ctx, badgeX, cy + 7, badgeW, 20, 4);
+    ctx.fill();
+    ctx.strokeStyle = col.typeColor + '25';
+    ctx.lineWidth = 1;
+    roundRect(ctx, badgeX, cy + 7, badgeW, 20, 4);
+    ctx.stroke();
+    ctx.fillStyle = col.typeColor;
+    ctx.font = '600 10px "Consolas", "Courier New", monospace';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(badgeText, badgeX + badgeW / 2, cy + 17);
+    ctx.restore();
+
+    // Calculate constraint badges width for name positioning
+    ctx.font = '700 9px "Segoe UI", system-ui, sans-serif';
+    let constraintW = 0;
+    const cParts = [];
+    if (col.isPk) cParts.push({ label: 'PK', color: '#d29922' });
+    if (col.isFk && !col.isPk) cParts.push({ label: 'FK', color: '#a371f7' });
+    if (col.isUq && !col.isPk) cParts.push({ label: 'UQ', color: '#58a6ff' });
+    for (const cp of cParts) constraintW += ctx.measureText(cp.label).width + 16;
+    ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
+    if (col.isNn) constraintW += ctx.measureText('NN').width + 24;
+    if (col.isAi) constraintW += ctx.measureText('AI').width + 24;
+
+    // Column name
+    const nameX2 = badgeX + badgeW + 10;
+    const nameMaxW2 = Math.max(20, x + w - nameX2 - constraintW - 20);
+    ctx.save();
+    ctx.fillStyle = '#c9d1d9';
+    ctx.font = '500 13px "Segoe UI", system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    const dispName = truncateText(col.name, ctx, nameMaxW2);
+    ctx.fillText(dispName, nameX2, cy + 17);
+    ctx.restore();
+
+    // Constraint badges
+    let cx2 = x + w - 14;
+    for (const cp of cParts) {
+      ctx.save();
+      ctx.font = '700 9px "Segoe UI", system-ui, sans-serif';
+      const cw = ctx.measureText(cp.label).width + 12;
+      const cbx = cx2 - cw;
+      ctx.fillStyle = cp.color + '18';
+      roundRect(ctx, cbx, cy + 8, cw, 18, 10);
+      ctx.fill();
+      ctx.strokeStyle = cp.color + '35';
+      ctx.lineWidth = 1;
+      roundRect(ctx, cbx, cy + 8, cw, 18, 10);
+      ctx.stroke();
+      ctx.fillStyle = cp.color;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText(cp.label, cbx + cw / 2, cy + 17);
+      ctx.restore();
+      cx2 = cbx - 4;
+    }
+
+    if (col.isNn) {
+      ctx.save();
+      ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
+      const tw = ctx.measureText('NN').width;
+      const totalW = tw + 20;
+      const cbx = cx2 - totalW;
+      ctx.fillStyle = '#f85149';
+      ctx.beginPath();
+      ctx.arc(cbx + 6, cy + 17, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f85149';
+      ctx.fillText('NN', cbx + 12, cy + 17);
+      cx2 = cbx - 4;
+      ctx.restore();
+    }
+
+    if (col.isAi) {
+      ctx.save();
+      ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
+      const tw = ctx.measureText('AI').width;
+      const totalW = tw + 20;
+      const cbx = cx2 - totalW;
+      ctx.fillStyle = '#3fb950';
+      ctx.beginPath();
+      ctx.arc(cbx + 6, cy + 17, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#3fb950';
+      ctx.fillText('AI', cbx + 12, cy + 17);
+      cx2 = cbx - 4;
+      ctx.restore();
     }
   }
-  const ox = !isFinite(minX) ? 0 : minX;
-  const oy = !isFinite(minY) ? 0 : minY;
-  const maxExtentX = !isFinite(maxX) ? Math.max(Math.ceil(parseInt(canvas.style.width) || 1200), 1200) : Math.ceil(maxX + pad);
-  const maxExtentY = !isFinite(maxY) ? Math.max(Math.ceil(parseInt(canvas.style.height) || 800), 800) : Math.ceil(maxY + pad);
-  const contentW = Math.max(maxExtentX - ox, 1200);
-  const contentH = Math.max(maxExtentY - oy, 800);
+}
 
-  return html2canvas(canvas, {
-    backgroundColor: '#0d1117',
-    scale: EXPORT_SCALE,
-    useCORS: true,
-    logging: false,
-    width: contentW + pad * 2,
-    height: contentH + pad * 2,
-    windowWidth: contentW + pad * 2,
-    windowHeight: contentH + pad * 2,
-    x: ox - pad,
-    y: oy - pad,
-    letterRendering: true,
-    onclone: function (doc) {
-      const containers = doc.querySelectorAll('.diagram-container');
-      containers.forEach(c => {
-        c.style.position = 'relative';
-        c.style.overflow = 'visible';
-        c.style.width = '100%';
-        c.style.height = '100%';
+function roundRect(ctx, x, y, w, h, r) {
+  if (typeof r === 'number') r = { tl: r, tr: r, bl: r, br: r };
+  else if (!r) r = { tl: 0, tr: 0, bl: 0, br: 0 };
+  ctx.beginPath();
+  ctx.moveTo(x + r.tl, y);
+  ctx.lineTo(x + w - r.tr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+  ctx.lineTo(x + w, y + h - r.br);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+  ctx.lineTo(x + r.bl, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+  ctx.lineTo(x, y + r.tl);
+  ctx.quadraticCurveTo(x, y, x + r.tl, y);
+  ctx.closePath();
+}
+
+function truncateText(text, ctx, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 1 && ctx.measureText(truncated + '...').width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + '...';
+}
+
+async function captureDiagram() {
+  console.log('[Export] Usando Canvas 2D nativo (sin html2canvas)');
+  const diagramCanvas = document.querySelector('.diagram-canvas');
+  if (!diagramCanvas) return Promise.reject('No se encontro el diagrama');
+
+  const svgEl = diagramCanvas.querySelector('.diagram-svg');
+  const cardEls = diagramCanvas.querySelectorAll('.table-card');
+  const bounds = computeBounds();
+  if (!bounds) return Promise.reject('No se pudieron calcular los limites');
+
+  const outW = Math.round(bounds.w * EXPORT_SCALE);
+  const outH = Math.round(bounds.h * EXPORT_SCALE);
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = outW;
+  outCanvas.height = outH;
+  const ctx = outCanvas.getContext('2d');
+  ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
+
+  // Background color
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, bounds.w, bounds.h);
+
+  // Background image
+  const bgImg = new Image();
+  await new Promise(resolve => { bgImg.onload = resolve; bgImg.onerror = resolve; bgImg.src = '/images/fondo.jpg'; });
+  if (bgImg.complete && bgImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalAlpha = 1;
+    ctx.drawImage(bgImg, 0, 0, bounds.w, bounds.h);
+    ctx.fillStyle = 'rgba(13,17,23,0.5)';
+    ctx.fillRect(0, 0, bounds.w, bounds.h);
+    ctx.restore();
+  }
+
+  // SVG connections
+  if (svgEl) {
+    const clone = svgEl.cloneNode(true);
+    clone.querySelectorAll('[filter]').forEach(el => el.removeAttribute('filter'));
+    clone.querySelectorAll('path').forEach(el => {
+      el.removeAttribute('filter');
+      const op = parseFloat(el.getAttribute('opacity') || '1');
+      if (op < 0.4) el.setAttribute('opacity', '0.7');
+    });
+    clone.querySelectorAll('image').forEach(el => el.remove());
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', bounds.w);
+    clone.setAttribute('height', bounds.h);
+    clone.setAttribute('viewBox', `${bounds.minX - PAD} ${bounds.minY - PAD} ${bounds.w} ${bounds.h}`);
+
+    try {
+      const str = new XMLSerializer().serializeToString(clone);
+      const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(str)));
+      const svgImage = await new Promise(resolve => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
       });
-      const cards = doc.querySelectorAll('.table-card');
-      cards.forEach(card => { card.style.position = 'absolute'; });
-      const cloned = doc.querySelector('.diagram-canvas');
-      if (cloned) {
-        cloned.style.position = 'absolute';
-        cloned.style.top = '0';
-        cloned.style.left = '0';
-        cloned.style.transform = 'none';
-        cloned.style.transformOrigin = '0 0';
-        cloned.style.width = maxExtentX + 'px';
-        cloned.style.height = maxExtentY + 'px';
+      if (svgImage) {
+        ctx.drawImage(svgImage, bounds.minX - PAD, bounds.minY - PAD, bounds.w, bounds.h);
       }
-      const svg = doc.querySelector('.diagram-svg');
-      if (svg) {
-        svg.setAttribute('width', String(maxExtentX));
-        svg.setAttribute('height', String(maxExtentY));
-        svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        svg.querySelectorAll('[filter]').forEach(el => el.removeAttribute('filter'));
-        svg.querySelectorAll('[marker-start]').forEach(el => el.removeAttribute('marker-start'));
-        svg.querySelectorAll('[marker-end]').forEach(el => el.removeAttribute('marker-end'));
-        svg.querySelectorAll('path').forEach(el => {
-          el.removeAttribute('filter');
-          el.removeAttribute('marker-start');
-          el.removeAttribute('marker-end');
-          const op = parseFloat(el.getAttribute('opacity') || '1');
-          if (op < 0.4) el.setAttribute('opacity', '0.7');
-        });
-        svg.querySelectorAll('image').forEach(el => el.remove());
-        try {
-          const svgStr = new XMLSerializer().serializeToString(svg);
-          const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
-          const img = doc.createElement('img');
-          img.src = dataUrl;
-          img.style.cssText = 'position:absolute;top:0;left:0;width:' + maxExtentX + 'px;height:' + maxExtentY + 'px;pointer-events:none';
-          svg.parentNode.insertBefore(img, svg);
-          svg.parentNode.removeChild(svg);
-        } catch(e) {}
-      }
-      const els = doc.querySelectorAll('[class*="truncate"]');
-      els.forEach(el => {
-        el.style.overflow = 'visible';
-        el.style.textOverflow = 'clip';
-        el.style.whiteSpace = 'normal';
-      });
-      const s = doc.createElement('style');
-      s.textContent = 'body,body *{font-family:"Segoe UI",system-ui,-apple-system,sans-serif!important}.font-mono,pre,code,textarea{font-family:"Consolas","Courier New",monospace!important}';
-      doc.head.appendChild(s);
+    } catch(e) {}
+  }
+
+  // Collect card data
+  const cardsData = Array.from(cardEls).map(card => getCardData(card));
+
+  // Draw cards
+  for (const data of cardsData) {
+    await yieldToBrowser();
+    drawCard(ctx, data);
+  }
+
+  return outCanvas;
+}
+
+function showPreview(canvas, format) {
+  return new Promise(resolve => {
+    const dataUrl = canvas.toDataURL('image/png');
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)';
+
+    const maxW = window.innerWidth * 0.85;
+    const maxH = window.innerHeight * 0.8;
+    let imgW = canvas.width / EXPORT_SCALE;
+    let imgH = canvas.height / EXPORT_SCALE;
+    if (imgW > maxW) { imgH = imgH * maxW / imgW; imgW = maxW; }
+    if (imgH > maxH) { imgW = imgW * maxH / imgH; imgH = maxH; }
+
+    let zoom = 1;
+    const minZoom = 0.25;
+    const maxZoom = 4;
+
+    function btnStyle(bg, text, border) {
+      return `padding:6px 14px;border:${border || 'none'};border-radius:6px;background:${bg};color:${text};font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;display:flex;align-items:center;gap:4px`;
     }
+
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.6)';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'color:#c9d1d9;font-size:14px;font-family:sans-serif;font-weight:600;margin-bottom:12px;text-align:center';
+    title.textContent = 'Vista previa - ' + format.toUpperCase();
+
+    const imgWrap = document.createElement('div');
+    imgWrap.style.cssText = `overflow:hidden;max-width:${maxW}px;max-height:${maxH}px;border-radius:8px;border:1px solid #30363d;cursor:grab;position:relative`;
+    imgWrap.style.userSelect = 'none';
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.draggable = false;
+    img.style.cssText = `display:block;transform-origin:0 0;width:${imgW}px;height:${imgH}px`;
+
+    let isDragging = false, startX, startY, startScrollLeft, startScrollTop;
+
+    imgWrap.addEventListener('wheel', e => {
+      e.preventDefault();
+      const rect = imgWrap.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const prev = zoom;
+      zoom = Math.max(minZoom, Math.min(maxZoom, zoom * (e.deltaY < 0 ? 1.2 : 1 / 1.2)));
+      img.style.transform = `scale(${zoom})`;
+      zoomLabel.textContent = Math.round(zoom * 100) + '%';
+      imgWrap.scrollLeft = (mx + imgWrap.scrollLeft) * (zoom / prev) - mx;
+      imgWrap.scrollTop = (my + imgWrap.scrollTop) * (zoom / prev) - my;
+    }, { passive: false });
+
+    imgWrap.addEventListener('mousedown', e => {
+      if (e.button !== 0) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      startScrollLeft = imgWrap.scrollLeft;
+      startScrollTop = imgWrap.scrollTop;
+      imgWrap.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      e.preventDefault();
+      imgWrap.scrollLeft = startScrollLeft - (e.clientX - startX);
+      imgWrap.scrollTop = startScrollTop - (e.clientY - startY);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        imgWrap.style.cursor = 'grab';
+      }
+    });
+
+    imgWrap.appendChild(img);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;margin-top:12px;align-items:center';
+
+    function updateZoom() {
+      img.style.transform = `scale(${zoom})`;
+      zoomLabel.textContent = Math.round(zoom * 100) + '%';
+      imgWrap.scrollLeft = (imgWrap.scrollWidth - imgWrap.clientWidth) / 2;
+      imgWrap.scrollTop = (imgWrap.scrollHeight - imgWrap.clientHeight) / 2;
+    }
+
+    const zoomOutBtn = document.createElement('button');
+    zoomOutBtn.innerHTML = '−';
+    zoomOutBtn.title = 'Alejar';
+    zoomOutBtn.style.cssText = btnStyle('#21262d', '#c9d1d9', '1px solid #30363d');
+    zoomOutBtn.onclick = () => { zoom = Math.max(minZoom, zoom / 1.4); updateZoom(); };
+
+    const zoomInBtn = document.createElement('button');
+    zoomInBtn.innerHTML = '+';
+    zoomInBtn.title = 'Acercar';
+    zoomInBtn.style.cssText = btnStyle('#21262d', '#c9d1d9', '1px solid #30363d');
+    zoomInBtn.onclick = () => { zoom = Math.min(maxZoom, zoom * 1.4); updateZoom(); };
+
+    const zoomLabel = document.createElement('span');
+    zoomLabel.style.cssText = 'color:#8b949e;font-size:12px;font-family:sans-serif;min-width:36px;text-align:center';
+    zoomLabel.textContent = '100%';
+
+    const dlBtn = document.createElement('button');
+    dlBtn.textContent = 'Descargar ' + format.toUpperCase();
+    dlBtn.style.cssText = btnStyle('#238636', '#fff');
+    dlBtn.onmouseover = () => dlBtn.style.background = '#2ea043';
+    dlBtn.onmouseout = () => dlBtn.style.background = '#238636';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancelar';
+    cancelBtn.style.cssText = btnStyle('transparent', '#8b949e', '1px solid #30363d');
+    cancelBtn.onmouseover = () => cancelBtn.style.background = '#21262d';
+    cancelBtn.onmouseout = () => cancelBtn.style.background = 'transparent';
+
+    btnRow.appendChild(zoomOutBtn);
+    btnRow.appendChild(zoomLabel);
+    btnRow.appendChild(zoomInBtn);
+    btnRow.appendChild(dlBtn);
+    btnRow.appendChild(cancelBtn);
+    box.appendChild(title);
+    box.appendChild(imgWrap);
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    dlBtn.onclick = () => { document.body.removeChild(overlay); resolve('download'); };
+    cancelBtn.onclick = () => { document.body.removeChild(overlay); resolve('cancel'); };
+    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve('cancel'); } };
   });
 }
 
 async function exportPNG(filename) {
   if (exportPending) return;
   const btn = document.querySelector('[data-export="png"]');
-  if (btn) {
-    btn.dataset.originalHtml = btn.innerHTML;
-    btn.innerHTML = '...';
-    btn.disabled = true;
-  }
+  if (btn) { btn.dataset.originalHtml = btn.innerHTML; btn.innerHTML = '...'; btn.disabled = true; }
   exportPending = true;
+  showLoadingOverlay();
   await yieldToBrowser();
-  captureDiagram().then(canvas => {
-    canvas.toBlob(blob => {
-      downloadBlob(blob, filename || 'diagrama.png');
+  captureDiagram().then(async canvas => {
+    hideLoadingOverlay();
+    const action = await showPreview(canvas, 'png');
+    if (action === 'download') {
+      canvas.toBlob(blob => {
+        downloadBlob(blob, filename || 'diagrama.png');
+        restoreExportBtn(btn, 'png');
+        exportPending = false;
+      }, 'image/png');
+    } else {
       restoreExportBtn(btn, 'png');
       exportPending = false;
-    }, 'image/png');
-  }).catch(() => { restoreExportBtn(btn, 'png'); exportPending = false; });
-}
-
-async function exportSVG(filename) {
-  if (exportPending) return;
-  const btn = document.querySelector('[data-export="svg"]');
-  if (btn) {
-    btn.dataset.originalHtml = btn.innerHTML;
-    btn.innerHTML = '...';
-    btn.disabled = true;
-  }
-  exportPending = true;
-  await yieldToBrowser();
-  captureDiagram().then(canvas => {
-    const dataUrl = canvas.toDataURL('image/png');
-    const w = canvas.width;
-    const h = canvas.height;
-    const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      <image href="${dataUrl}" width="${w}" height="${h}" />
-    </svg>`;
-    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-    downloadBlob(blob, filename || 'diagrama.svg');
-    restoreExportBtn(btn, 'svg');
-    exportPending = false;
-  }).catch(() => { restoreExportBtn(btn, 'svg'); exportPending = false; });
+    }
+  }).catch(() => { restoreExportBtn(btn, 'png'); exportPending = false; hideLoadingOverlay(); });
 }
 
 async function exportPDF(filename) {
   if (exportPending) return;
   const btn = document.querySelector('[data-export="pdf"]');
-  if (btn) {
-    btn.dataset.originalHtml = btn.innerHTML;
-    btn.innerHTML = '...';
-    btn.disabled = true;
-  }
+  if (btn) { btn.dataset.originalHtml = btn.innerHTML; btn.innerHTML = '...'; btn.disabled = true; }
   exportPending = true;
+  showLoadingOverlay();
   await yieldToBrowser();
-  captureDiagram().then(canvas => {
-    const imgData = canvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const w = canvas.width / EXPORT_SCALE;
-    const h = canvas.height / EXPORT_SCALE;
-    const orientation = w > h ? 'landscape' : 'portrait';
-    const pdf = new jsPDF({ orientation, unit: 'px', format: [w, h], compress: true });
-    pdf.addImage(imgData, 'PNG', 0, 0, w, h, undefined, 'FAST');
-    pdf.save(filename || 'diagrama.pdf');
+  captureDiagram().then(async canvas => {
+    hideLoadingOverlay();
+    const action = await showPreview(canvas, 'pdf');
+    if (action === 'download') {
+      const imgData = canvas.toDataURL('image/png');
+      const { PDFDocument } = PDFLib;
+      const w = canvas.width / EXPORT_SCALE;
+      const h = canvas.height / EXPORT_SCALE;
+      const pdfDoc = await PDFDocument.create();
+      const pngImageBytes = await fetch(imgData).then(r => r.arrayBuffer());
+      const pngImage = await pdfDoc.embedPng(pngImageBytes);
+      const page = pdfDoc.addPage([w, h]);
+      page.drawImage(pngImage, { x: 0, y: 0, width: w, height: h });
+      const pdfBytes = await pdfDoc.save();
+      downloadBlob(new Blob([pdfBytes], { type: 'application/pdf' }), filename || 'diagrama.pdf');
+    }
     restoreExportBtn(btn, 'pdf');
     exportPending = false;
-  }).catch(() => { restoreExportBtn(btn, 'pdf'); exportPending = false; });
+  }).catch(() => { restoreExportBtn(btn, 'pdf'); exportPending = false; hideLoadingOverlay(); });
 }
 
 function restoreExportBtn(btn, type) {
   if (!btn) return;
-  if (btn.dataset.originalHtml) {
-    btn.innerHTML = btn.dataset.originalHtml;
-    delete btn.dataset.originalHtml;
-  } else {
+  if (btn.dataset.originalHtml) { btn.innerHTML = btn.dataset.originalHtml; delete btn.dataset.originalHtml; }
+  else {
     const icons = { png: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>', svg: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>', pdf: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' };
     btn.innerHTML = icons[type] || '';
   }
