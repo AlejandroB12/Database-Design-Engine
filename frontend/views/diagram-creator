@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diagram Creator - Database Modeler</title>
+  <script src="/lib/tailwind.js"></script>
+  <script src="/lib/react.production.min.js"></script>
+  <script src="/lib/react-dom.production.min.js"></script>
+  <script src="/lib/babel.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0d1117; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #161b22; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+    .diagram-container { cursor: grab; }
+    .diagram-container.panning { cursor: grabbing; }
+    .diagram-container .table-card { cursor: default; }
+    .diagram-pattern {
+      background-color: #0d1117;
+      background-image: url('/images/fondo.jpg');
+      background-size: cover;
+      background-position: center;
+      background-blend-mode: overlay;
+    }
+    .diagram-svg { pointer-events: none; }
+    .diagram-canvas { transform-origin: 0 0; }
+    .diagram-svg line { cursor: pointer; }
+    .table-card.dragging { z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08) !important; transform: translateY(-2px); }
+    .table-card.relation-source { box-shadow: 0 0 0 2px #58a6ff, 0 0 20px rgba(88,166,255,0.3) !important; }
+    .table-card.relation-target { box-shadow: 0 0 0 2px #3fb950, 0 0 20px rgba(63,185,80,0.3) !important; }
+    button {
+      position: relative;
+      box-shadow: 0 2px 0 rgba(13,17,23,0.6), 0 4px 8px rgba(0,0,0,0.3);
+      transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateY(0);
+    }
+    button:hover:not(:disabled) {
+      box-shadow: 0 3px 0 rgba(13,17,23,0.6), 0 6px 14px rgba(0,0,0,0.45);
+      transform: translateY(-1px);
+    }
+    button:active:not(:disabled) {
+      box-shadow: 0 1px 0 rgba(13,17,23,0.6), 0 2px 4px rgba(0,0,0,0.25);
+      transform: translateY(1px);
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    @keyframes col-pulse {
+      0%, 100% { background-color: rgba(88, 166, 255, 0.06); border-left-color: rgba(88, 166, 255, 0.2); }
+      25% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
+      50% { background-color: rgba(88, 166, 255, 0.2); border-left-color: rgba(88, 166, 255, 0.6); }
+      75% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
+    }
+    .col-pulse { animation: col-pulse 1.2s ease-in-out 2; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useCallback, useMemo, useRef, useEffect } = React;
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const COLUMN_TYPES = ['INT','BIGINT','SMALLINT','TINYINT','VARCHAR','CHAR','TEXT','MEDIUMTEXT','LONGTEXT','BOOLEAN','DATE','DATETIME','TIMESTAMP','FLOAT','DOUBLE','DECIMAL','BLOB','ENUM','UUID','JSON'];
+const BTN_STYLES = { pk: 'bg-[#d29922]/20 border-[#d29922]/50 text-[#d29922]', ai: 'bg-[#238636]/20 border-[#238636]/50 text-[#3fb950]', nn: 'bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]', uq: 'bg-[#58a6ff]/20 border-[#58a6ff]/50 text-[#58a6ff]' };
+const TCOLOR = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+
+function midpoint(p1, p2) { return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; }
+
+function closestOnRect(px, py, rx, ry, rw, rh) {
+  const left = rx, right = rx + rw, top = ry, bottom = ry + rh;
+  const cx = Math.max(left, Math.min(right, px));
+  const cy = Math.max(top, Math.min(bottom, py));
+  if (cx === px && cy === py) {
+    const dl = px - left, dr = right - px, dt = py - top, db = bottom - py;
+    const min = Math.min(dl, dr, dt, db);
+    if (min === dl) return { x: left, y: cy };
+    if (min === dr) return { x: right, y: cy };
+    if (min === dt) return { x: cx, y: top };
+    return { x: cx, y: bottom };
+  }
+  if (px < left) { if (py < top) return { x: left, y: top }; if (py > bottom) return { x: left, y: bottom }; return { x: left, y: py }; }
+  if (px > right) { if (py < top) return { x: right, y: top }; if (py > bottom) return { x: right, y: bottom }; return { x: right, y: py }; }
+  if (py < top) return { x: px, y: top };
+  return { x: px, y: bottom };
+}
+
+function snapEndpointsToEntity(points, srcId, tgtId, entities, positions, dims) {
+  if (points.length < 2) return points;
+  const np = points.map(p => ({...p}));
+  if (dims[srcId] && positions[srcId]) {
+    const p = positions[srcId], d = dims[srcId];
+    const ref = np.length >= 2 ? np[1] : np[0];
+    const sn = closestOnRect(ref.x, ref.y, p.x, p.y, d.w, d.h);
+    np[0] = sn;
+    if (np.length >= 2) {
+      if (Math.abs(sn.x - np[1].x) < Math.abs(sn.y - np[1].y)) np[1].x = sn.x; else np[1].y = sn.y;
+    }
+  }
+  if (dims[tgtId] && positions[tgtId]) {
+    const p = positions[tgtId], d = dims[tgtId];
+    const li = np.length - 1;
+    const ref = np.length >= 2 ? np[li - 1] : np[li];
+    const sn = closestOnRect(ref.x, ref.y, p.x, p.y, d.w, d.h);
+    np[li] = sn;
+    if (np.length >= 2) {
+      if (Math.abs(sn.x - np[li - 1].x) < Math.abs(sn.y - np[li - 1].y)) np[li - 1].x = sn.x; else np[li - 1].y = sn.y;
+    }
+  }
+  return np;
+}
+
+function pathLength(points) {
+  let len = 0;
+  for (let i = 0; i < points.length - 1; i++) len += Math.abs(points[i].x - points[i+1].x) + Math.abs(points[i].y - points[i+1].y);
+  return len;
+}
+
+function pathCrossesRect(points, rect) {
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i], p2 = points[i+1];
+    if (p1.x === p2.x) {
+      const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
+      if (p1.x >= rect.x && p1.x <= rect.x + rect.w && maxY >= rect.y && minY <= rect.y + rect.h) return true;
+    } else {
+      const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
+      if (p1.y >= rect.y && p1.y <= rect.y + rect.h && maxX >= rect.x && minX <= rect.x + rect.w) return true;
+    }
+  }
+  return false;
+}
+
+function findRoute(srcRect, srcColIdx, tgtRect, tgtColIdx, obstacles) {
+  const colH = 34, headerH = 40;
+  const getColY = (rect, idx) => rect.y + headerH + (idx >= 0 ? idx * colH + colH / 2 : colH / 2);
+  const sCy = getColY(srcRect, srcColIdx);
+  const tCy = getColY(tgtRect, tgtColIdx);
+  const sCx = srcRect.x + srcRect.w / 2;
+  const tCx = tgtRect.x + tgtRect.w / 2;
+  const padObs = obstacles.map(o => ({ x: o.x - 8, y: o.y - 8, w: o.w + 16, h: o.h + 16 }));
+  const candidates = [];
+  candidates.push({ points: [{ x: srcRect.x + srcRect.w, y: sCy }, { x: (srcRect.x + srcRect.w + tgtRect.x) / 2, y: sCy }, { x: (srcRect.x + srcRect.w + tgtRect.x) / 2, y: tCy }, { x: tgtRect.x, y: tCy }]});
+  candidates.push({ points: [{ x: srcRect.x, y: sCy }, { x: (srcRect.x + tgtRect.x + tgtRect.w) / 2, y: sCy }, { x: (srcRect.x + tgtRect.x + tgtRect.w) / 2, y: tCy }, { x: tgtRect.x + tgtRect.w, y: tCy }]});
+  candidates.push({ points: [{ x: sCx, y: srcRect.y + srcRect.h }, { x: sCx, y: (srcRect.y + srcRect.h + tgtRect.y) / 2 }, { x: tCx, y: (srcRect.y + srcRect.h + tgtRect.y) / 2 }, { x: tCx, y: tgtRect.y }]});
+  candidates.push({ points: [{ x: sCx, y: srcRect.y }, { x: sCx, y: (srcRect.y + tgtRect.y + tgtRect.h) / 2 }, { x: tCx, y: (srcRect.y + tgtRect.y + tgtRect.h) / 2 }, { x: tCx, y: tgtRect.y + tgtRect.h }]});
+  if (obstacles.length > 0) {
+    const aboveY = Math.min(srcRect.y, tgtRect.y, ...obstacles.map(o => o.y)) - 50;
+    const belowY = Math.max(srcRect.y + srcRect.h, tgtRect.y + tgtRect.h, ...obstacles.map(o => o.y + o.h)) + 50;
+    const rightX = Math.max(srcRect.x + srcRect.w, tgtRect.x + tgtRect.w, ...obstacles.map(o => o.x + o.w)) + 50;
+    const leftX = Math.min(srcRect.x, tgtRect.x, ...obstacles.map(o => o.x)) - 50;
+    candidates.push({ points: [{ x: sCx, y: srcRect.y }, { x: sCx, y: aboveY }, { x: tCx, y: aboveY }, { x: tCx, y: tgtRect.y }]});
+    candidates.push({ points: [{ x: sCx, y: srcRect.y + srcRect.h }, { x: sCx, y: belowY }, { x: tCx, y: belowY }, { x: tCx, y: tgtRect.y + tgtRect.h }]});
+    candidates.push({ points: [{ x: srcRect.x + srcRect.w, y: sCy }, { x: rightX, y: sCy }, { x: rightX, y: tCy }, { x: tgtRect.x, y: tCy }]});
+    candidates.push({ points: [{ x: srcRect.x, y: sCy }, { x: leftX, y: sCy }, { x: leftX, y: tCy }, { x: tgtRect.x + tgtRect.w, y: tCy }]});
+  }
+  let best = null, bestScore = Infinity;
+  for (const c of candidates) {
+    let score = 0;
+    for (const obs of padObs) { if (pathCrossesRect(c.points, obs)) score += 1000; }
+    score += pathLength(c.points);
+    if (score < bestScore) { bestScore = score; best = c.points; }
+  }
+  return best;
+}
+
+function pointsToAngularPath(points) {
+  if (points.length < 2) return '';
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length; i++) d += ` L ${points[i].x},${points[i].y}`;
+  return d;
+}
+
+function ColumnBadge({ col, tableId, tableName, activeRel, hoveredRel, relInfo, pulseRel }) {
+  const typeColor = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+  const constraintMeta = col.pk ? { color: '#d29922', label: 'PK' } : col.uq ? { color: '#58a6ff', label: 'UQ' } : { color: null, label: '' };
+  const accentColor = col.pk ? '#d29922' : col.fk ? '#a371f7' : col.uq ? '#58a6ff' : null;
+  const highlight = activeRel || hoveredRel;
+  const tc = typeColor[col.type] || '#8b949e';
+  return (
+    <div className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${highlight ? 'bg-[#1f6feb]/12' : 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
+      style={{ height: 34, borderLeft: accentColor ? `2px solid ${accentColor}60` : '2px solid transparent' }}>
+      <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
+        style={{
+          color: highlight ? '#ffffff' : tc,
+          background: highlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
+          border: `1px solid ${highlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
+          boxShadow: highlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
+        }}>{col.type}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${highlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name || <span className="text-[#6e7681] italic">sin nombre</span>}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {constraintMeta.label && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: constraintMeta.color,
+              background: `${constraintMeta.color}18`,
+              border: `1px solid ${constraintMeta.color}35`
+            }}>{constraintMeta.label}</span>
+        )}
+        {col.fk && !col.pk && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: '#a371f7',
+              background: '#a371f718',
+              border: '1px solid #a371f735'
+            }}>FK</span>
+        )}
+        {col.nn && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: highlight ? 'rgba(255,255,255,0.6)' : '#f85149' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: highlight ? 'rgba(255,255,255,0.6)' : '#f85149' }} />
+            NN
+          </span>
+        )}
+        {col.ai && (
+          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
+            style={{ color: highlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }}>
+            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: highlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }} />
+            AI
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EntityCard = React.forwardRef(({ entity, position, selected, onSelect, onDragStart, onDelete, onAddColumn, activeRel, hoveredRel, relInfo, pulseRel, relationMode, isRelSrc, isRelTgt }, ref) => {
+  const c = entity.color || '#6366f1';
+  return (
+    <div ref={ref} className={`table-card absolute rounded-lg overflow-hidden w-[310px] ${isRelSrc ? 'relation-source' : isRelTgt ? 'relation-target' : ''}`}
+      onClick={relationMode ? (e) => { e.stopPropagation(); onSelect(entity.id); } : undefined}
+      style={{
+        left: position.x, top: position.y,
+        background: 'linear-gradient(180deg, rgba(22,27,34,0.88) 0%, rgba(13,17,23,0.94) 100%)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        border: '1px solid', borderColor: selected ? c + '99' : 'rgba(48,54,61,0.6)',
+        borderLeft: `3px solid ${c}${selected ? 'cc' : '80'}`,
+        boxShadow: selected ? `0 0 0 1px ${c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)` : '0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
+        borderBottom: `2px solid ${c}${selected ? '80' : '30'}`
+      }}>
+      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none" style={{ background: `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${c}35` }}
+        onMouseDown={(e) => onDragStart(e, entity.id)}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-[10px] h-[10px] rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}50` }} />
+          <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{entity.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[#6e7681] font-medium">{entity.columns.length} col.</span>
+          {selected && (
+            <button onClick={e => { e.stopPropagation(); onDelete(entity.id); }} className="text-[#f85149] rounded p-1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          )}
+        </div>
+      </div>
+      <div>
+        {entity.columns.length === 0 ? (
+          <div className="px-3 py-4 text-center" style={{ background: 'rgba(13,17,23,0.3)' }}><p className="text-[12px] text-[#6e7681] italic">Sin columnas</p></div>
+        ) : (
+          entity.columns.map(col => <ColumnBadge key={col.id} col={col} tableId={entity.id} tableName={entity.name} activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={pulseRel} />)
+        )}
+      </div>
+      {selected && (
+        <div className="px-2 py-1.5 border-t border-[rgba(48,54,61,0.5)]" style={{ background: 'rgba(13,17,23,0.7)' }}>
+          <button onClick={e => { e.stopPropagation(); onAddColumn(entity.id); }}
+            className="w-full text-[11px] font-medium text-[#c9d1d9] bg-[#1f6feb]/15 hover:bg-[#1f6feb]/25 rounded py-1.5 border border-[#58a6ff]/25 transition-colors">+ Columna</button>
+        </div>
+      )}
+    </div>
+  );
+});
+
+function ColumnEditor({ col, onUpdate, onDelete }) {
+  const [local, setLocal] = useState({ ...col });
+  useEffect(() => setLocal({ ...col }), [col]);
+  const sync = useCallback((upd) => { const n = { ...local, ...upd }; setLocal(n); onUpdate(col.id, n); }, [col.id, local, onUpdate]);
+  return (
+    <div className="px-3 py-1.5 flex items-center gap-1.5 hover:bg-[#21262d]/30 border-b border-[#30363d]/20 last:border-b-0">
+      <input value={local.name} onChange={e => sync({ name: e.target.value })} placeholder="col" className="w-20 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681]" />
+      <select value={local.type} onChange={e => sync({ type: e.target.value })} className="w-[76px] bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none">
+        {COLUMN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+      </select>
+      {['VARCHAR','CHAR'].includes(local.type) && (
+        <input type="number" value={local.length || (local.type === 'CHAR' ? 1 : 255)} onChange={e => sync({ length: parseInt(e.target.value) || (local.type === 'CHAR' ? 1 : 255) })} className="w-10 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none text-center" title="Longitud" />
+      )}
+      {local.type === 'ENUM' && (
+        <input value={local.values || ''} onChange={e => sync({ values: e.target.value })} placeholder="a,b,c" className="w-16 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681] text-center" title="Valores" />
+      )}
+      {['DECIMAL','FLOAT','DOUBLE'].includes(local.type) && (
+        <input type="number" value={local.length || 10} onChange={e => sync({ length: parseInt(e.target.value) || 10 })} className="w-10 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none text-center" title="Precisión" />
+      )}
+      <div className="flex gap-px ml-auto">
+        {[{k:'pk',l:'PK'},{k:'ai',l:'AI'},{k:'nn',l:'NN'},{k:'uq',l:'UQ'}].map(({k,l}) => (
+          <button key={k} onClick={() => { const nv = !local[k]; const upd = { [k]: nv }; if (k === 'pk' && nv) upd.fk = false; sync(upd); }}
+            className={`text-[9px] font-bold px-1.5 py-1 rounded border leading-none min-w-[22px] ${local[k] ? BTN_STYLES[k] : 'bg-[#21262d] border-[#30363d] text-[#6e7681] hover:border-[#484f58]'}`}>{l}</button>
+        ))}
+        <button onClick={() => onDelete(col.id)} className="text-[#6e7681] hover:text-[#f85149] p-1 rounded hover:bg-[#f85149]/10 ml-0.5">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RelationConfig({ relation, entities, onUpdate, onDelete, onClose, linePaths, onResetLinePath, onUndoLinePath }) {
+  const src = entities.find(e => e.id === relation.sourceId);
+  const tgt = entities.find(e => e.id === relation.targetId);
+  return (
+    <div className="absolute top-4 left-4 bg-[#21262d]/95 backdrop-blur-sm border border-[#30363d]/60 rounded-xl p-3 shadow-2xl z-20 min-w-[260px]">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[12px] text-[#6e7681]">Relación</span>
+        <div className="flex-1" />
+        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-0.5 rounded"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[13px] font-semibold text-[#e6edf3]">{src?.name || '?'}</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        <span className="text-[13px] font-semibold text-[#e6edf3]">{tgt?.name || '?'}</span>
+      </div>
+      <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2">
+        <span className="text-[11px] text-[#6e7681] shrink-0">Cardinalidad:</span>
+        {['1:1', '1:M', 'M:1', 'M:M'].map(c => (
+          <button key={c} onClick={() => onUpdate(relation.id, { cardinality: c })}
+            className={`text-[10px] font-mono font-bold px-2 py-1 rounded border ${relation.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681]'}`}>{c}</button>
+        ))}
+      </div>
+      {linePaths && linePaths[relation.id] && (
+        <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2 mt-2">
+          <button onClick={() => { onResetLinePath(relation.id); }}
+            className="text-[10px] font-bold px-2 py-1 rounded border bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]">✕ Auto</button>
+          <button onClick={() => { onUndoLinePath && onUndoLinePath(relation.id); }}
+            className="text-[10px] font-bold px-2 py-1 rounded border bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]">↩ Deshacer</button>
+        </div>
+      )}
+      <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2 mt-2">
+        <button onClick={() => onDelete(relation.id)} className="text-[10px] font-bold px-2 py-1 rounded border bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]">Eliminar relación</button>
+      </div>
+    </div>
+  );
+}
+
+function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActiveRel, relationMode, relationSource, onRelationClick, onDragStart, onDeleteEntity, onAddColumn, linePaths, onUpdateLinePath, onResetLinePath, onSaveLinePathState, onUndoLinePath, onPositionsChange, onSetZoom, onSetPan, selectedId, onSetSelected }) {
+  const containerRef = useRef(null);
+  const dragRef = useRef(null);
+  const entityRefs = useRef({});
+  const [entityDims, setEntityDims] = useState({});
+  const [isPanning, setIsPanning] = useState(false);
+  const panDragRef = useRef(null);
+  const waypointDragRef = useRef(null);
+  const entitiesRef = useRef(entities); entitiesRef.current = entities;
+  const positionsRef = useRef(positions); positionsRef.current = positions;
+  const entityDimsRef = useRef(entityDims); entityDimsRef.current = entityDims;
+  const rafRef = useRef(null);
+  const pendingMouseEvent = useRef(null);
+  const zoomRef = useRef(zoom); zoomRef.current = zoom;
+  const panRef = useRef(pan); panRef.current = pan;
+  const selectedIdRef = useRef(selectedId); selectedIdRef.current = selectedId;
+  const activeRelRef = useRef(activeRel); activeRelRef.current = activeRel;
+  const [hoveredRel, setHoveredRel] = useState(null);
+  const [selRect, setSelRect] = useState(null);
+  const selRectRef = useRef(null);
+
+  useEffect(() => {
+    const dims = {};
+    for (const e of entities) {
+      const el = entityRefs.current[e.id];
+      if (el) { const r = el.getBoundingClientRect(); dims[e.id] = { w: r.width / zoom, h: r.height / zoom }; }
+    }
+    setEntityDims(dims);
+  }, [entities, zoom]);
+
+  const relInfo = useMemo(() => {
+    const m = {};
+    for (const rel of relations) m[rel.id] = { sourceId: rel.sourceId, targetId: rel.targetId, cardinality: rel.cardinality };
+    return m;
+  }, [relations]);
+
+  const svgLines = useMemo(() => {
+    const lines = []; const rects = {};
+    for (const e of entities) { const p = positions[e.id]; const d = entityDims[e.id]; if (p && d) rects[e.id] = { x: p.x, y: p.y, w: d.w, h: d.h }; }
+    for (const rel of relations) {
+      const srcRect = rects[rel.sourceId]; const tgtRect = rects[rel.targetId];
+      if (!srcRect || !tgtRect) continue;
+      const srcIdx = entities.find(e => e.id === rel.sourceId)?.columns.findIndex(c => c.pk) || 0;
+      const tgtIdx = entities.find(e => e.id === rel.targetId)?.columns.findIndex(c => c.pk) || 0;
+      const obstacles = entities.filter(e2 => e2.id !== rel.sourceId && e2.id !== rel.targetId).map(e2 => rects[e2.id]).filter(Boolean);
+      let points;
+      if (linePaths && linePaths[rel.id]) {
+        points = linePaths[rel.id];
+      } else {
+        points = findRoute(srcRect, srcIdx, tgtRect, tgtIdx, obstacles);
+      }
+      if (points) {
+        const card = rel.cardinality || '1:M';
+        const sp = points.length >= 2 ? midpoint(points[0], points[1]) : points[0];
+        const ep = points.length >= 2 ? midpoint(points[points.length - 2], points[points.length - 1]) : points[points.length - 1];
+        let sl, el, sm, em;
+        switch (card) { case '1:1': sl='1'; el='1'; sm='one'; em='one'; break; case '1:M': sl='1'; el='N'; sm='one'; em='many'; break; case 'M:1': sl='N'; el='1'; sm='many'; em='one'; break; case 'M:M': sl='N'; el='N'; sm='many'; em='many'; break; default: sl='N'; el='1'; sm='many'; em='one'; }
+        lines.push({ key: rel.id, points, startPos: sp, endPos: ep, startLabel: sl, endLabel: el, startMarker: sm, endMarker: em, cardinality: card });
+      }
+    }
+    return lines;
+  }, [entities, relations, positions, entityDims, linePaths]);
+
+  const handleWheel = useCallback((e) => { e.preventDefault(); onSetZoom(z => Math.max(0.25, Math.min(3, z + (e.deltaY > 0 ? -0.1 : 0.1)))); }, [onSetZoom]);
+
+  const handleMouseDown = useCallback((e, entityId) => {
+    if (e.button !== 0) return; e.stopPropagation();
+    if (relationMode) return;
+    const pos = positions[entityId];
+    if (!pos) return;
+    const dragInfo = { entityId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
+    if (linePaths) {
+      const dragNames = new Set([entities.find(e => e.id === entityId)?.name]);
+      const affected = {};
+      for (const [key, pts] of Object.entries(linePaths)) {
+        const rel = relations.find(r => r.id === key);
+        if (!rel) continue;
+        const indices = [];
+        if (rel.sourceId === entityId) indices.push(0);
+        if (rel.targetId === entityId) indices.push(pts.length - 1);
+        if (indices.length > 0) affected[key] = { pts: pts.map(p => ({...p})), indices };
+      }
+      dragInfo.affectedLinePaths = affected;
+    }
+    dragRef.current = dragInfo;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [positions, entities, relations, linePaths, relationMode, handleMouseMove, handleMouseUp]);
+
+  const handleWaypointMove = useCallback((e) => {
+    const dr = waypointDragRef.current;
+    if (!dr) return;
+    const dx = (e.clientX - dr.startX) / zoomRef.current;
+    const dy = (e.clientY - dr.startY) / zoomRef.current;
+    const pi = dr.pointIndex;
+    const orig = dr.origPoints;
+    if (pi <= 0 || pi >= orig.length - 1) {
+      let np = orig.map((p, i) => i === pi ? { x: p.x + dx, y: p.y + dy } : { ...p });
+      const rel = relations.find(r => r.id === dr.relId);
+      if (rel) np = snapEndpointsToEntity(np, rel.sourceId, rel.targetId, entitiesRef.current, positionsRef.current, entityDimsRef.current);
+      onUpdateLinePath(dr.relId, np);
+      return;
+    }
+    const eps = 0.5;
+    const pH = Math.abs(orig[pi - 1].y - orig[pi].y) < eps;
+    const nH = Math.abs(orig[pi].y - orig[pi + 1].y) < eps;
+    const np = orig.map(p => ({ ...p }));
+    np[pi].x = orig[pi].x + dx; np[pi].y = orig[pi].y + dy;
+    if (pH && !nH) { np[pi - 1].x = orig[pi - 1].x; np[pi - 1].y = np[pi].y; np[pi + 1].x = np[pi].x; np[pi + 1].y = orig[pi + 1].y; }
+    else if (!pH && nH) { np[pi - 1].x = np[pi].x; np[pi - 1].y = orig[pi - 1].y; np[pi + 1].x = orig[pi + 1].x; np[pi + 1].y = np[pi].y; }
+    const rel = relations.find(r => r.id === dr.relId);
+    const snapped = rel ? snapEndpointsToEntity(np, rel.sourceId, rel.targetId, entitiesRef.current, positionsRef.current, entityDimsRef.current) : np;
+    onUpdateLinePath(dr.relId, snapped);
+  }, [onUpdateLinePath, relations]);
+
+  const handleLineMouseDown = useCallback((e, relId, points) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    if (onSaveLinePathState) onSaveLinePathState(relId);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = (e.clientX - rect.left - pan.x) / zoom;
+    const my = (e.clientY - rect.top - pan.y) / zoom;
+    let bestSeg = 0, bestDist = Infinity;
+    for (let i = 0; i < points.length - 1; i++) {
+      const ax = points[i].x, ay = points[i].y, bx = points[i + 1].x, by = points[i + 1].y;
+      const dx = bx - ax, dy = by - ay, len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.001) continue;
+      const t = Math.max(0, Math.min(1, ((mx - ax) * dx + (my - ay) * dy) / (len * len)));
+      const cx = ax + t * dx, cy = ay + t * dy, dist = Math.hypot(mx - cx, my - cy);
+      if (dist < bestDist) { bestDist = dist; bestSeg = i; }
+    }
+    const newPts = [...points];
+    newPts.splice(bestSeg + 1, 0, { x: mx, y: my });
+    onUpdateLinePath(relId, newPts);
+    setActiveRel(relId);
+    waypointDragRef.current = { relId, pointIndex: bestSeg + 1, startX: e.clientX, startY: e.clientY, origPoints: newPts.map(p => ({ ...p })) };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pan, zoom, onUpdateLinePath, onSaveLinePathState, setActiveRel, handleMouseMove, handleMouseUp]);
+
+  const handleWaypointDblClick = useCallback((e, relId, pi, pts) => {
+    e.preventDefault(); e.stopPropagation();
+    if (pts.length <= 2) return;
+    if (onSaveLinePathState) onSaveLinePathState(relId);
+    const np = pts.filter((_, i) => i !== pi);
+    if (np.length < 2) { onResetLinePath(relId); return; }
+    onUpdateLinePath(relId, np);
+  }, [onUpdateLinePath, onResetLinePath, onSaveLinePathState]);
+
+  const processMouseEvent = useCallback((e) => {
+    if (dragRef.current) {
+      const dr = dragRef.current;
+      const dx = (e.clientX - dr.startX) / zoomRef.current;
+      const dy = (e.clientY - dr.startY) / zoomRef.current;
+      if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
+      onPositionsChange(dr.entityId, dr.origX + dx, dr.origY + dy);
+      if (dr.affectedLinePaths) {
+        for (const [key, { pts: origPts, indices }] of Object.entries(dr.affectedLinePaths)) {
+          const np = origPts.map((p, i) => indices.includes(i) ? { x: p.x + dx, y: p.y + dy } : { ...p });
+          for (const idx of indices) {
+            const eps = 0.5;
+            if (idx === 0 && np.length >= 2) { if (Math.abs(origPts[0].y - origPts[1].y) < eps) np[1].y = np[0].y; else np[1].x = np[0].x; }
+            if (idx === np.length - 1 && np.length >= 2) { const last = np.length - 1; if (Math.abs(origPts[last - 1].y - origPts[last].y) < eps) np[last - 1].y = np[last].y; else np[last - 1].x = np[last].x; }
+          }
+          const rel = relations.find(r => r.id === key);
+          const snapped = rel ? snapEndpointsToEntity(np, rel.sourceId, rel.targetId, entitiesRef.current, positionsRef.current, entityDimsRef.current) : np;
+          onUpdateLinePath(key, snapped);
+        }
+      }
+      return;
+    }
+    if (panDragRef.current) {
+      onSetPan({ x: panDragRef.current.origPanX + (e.clientX - panDragRef.current.startX), y: panDragRef.current.origPanY + (e.clientY - panDragRef.current.startY) });
+    }
+    const wdr = waypointDragRef.current;
+    if (wdr) handleWaypointMove(e);
+  }, [onPositionsChange, handleWaypointMove, onUpdateLinePath, onSetPan, relations]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (selRectRef.current) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mx = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
+      const my = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
+      selRectRef.current = { ...selRectRef.current, endX: mx, endY: my };
+      setSelRect({ ...selRectRef.current });
+      return;
+    }
+    pendingMouseEvent.current = e;
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const ev = pendingMouseEvent.current;
+        if (ev && (dragRef.current || panDragRef.current || waypointDragRef.current)) processMouseEvent(ev);
+      });
+    }
+  }, [processMouseEvent]);
+
+  const handleMouseUp = useCallback((e) => {
+    if (waypointDragRef.current) { waypointDragRef.current = null; }
+    if (selRectRef.current) {
+      const r = selRectRef.current;
+      const minX = Math.min(r.startX, r.endX), maxX = Math.max(r.startX, r.endX);
+      const minY = Math.min(r.startY, r.endY), maxY = Math.max(r.startY, r.endY);
+      selRectRef.current = null; setSelRect(null);
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        const ids = [];
+        for (const e of entitiesRef.current) {
+          const p = positionsRef.current[e.id]; if (!p) continue;
+          const h = 40 + e.columns.length * 34 + 44;
+          if (p.x < maxX && p.x + 310 > minX && p.y < maxY && p.y + h > minY) ids.push(e.id);
+        }
+        if (ids.length > 0) onSetSelected(ids[0]);
+      }
+    }
+    if (dragRef.current) {
+      if (!dragRef.current.moved && e.target.closest('.table-card')) {
+        if (!relationMode) onSetSelected(dragRef.current.entityId);
+      }
+      dragRef.current = null;
+    }
+    if (panDragRef.current) { panDragRef.current = null; setIsPanning(false); }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    pendingMouseEvent.current = null;
+    document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp);
+  }, [onSetSelected, relationMode, handleMouseMove, handleMouseUp]);
+
+  useEffect(() => { return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); }; }, [handleMouseMove, handleMouseUp]);
+
+  const handleWpMouseDown = useCallback((e, relId, pi) => {
+    e.stopPropagation();
+    if (onSaveLinePathState) onSaveLinePathState(relId);
+    const src = (linePaths && linePaths[relId]) || svgLines.find(l => l.key === relId)?.points;
+    if (!src) return;
+    waypointDragRef.current = { relId, pointIndex: pi, startX: e.clientX, startY: e.clientY, origPoints: src.map(p => ({ ...p })) };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [linePaths, svgLines, handleMouseMove, handleMouseUp, onSaveLinePathState]);
+
+  const handleCanvasMouseDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.table-card') || e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea')) return;
+    setActiveRel(null);
+    if (relationMode) { onRelationClick(null); return; }
+    onSetSelected(null);
+    panDragRef.current = { startX: e.clientX, startY: e.clientY, origPanX: pan.x, origPanY: pan.y };
+    setIsPanning(true);
+    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+  }, [pan.x, pan.y, relationMode, onRelationClick, onSetSelected, handleMouseMove, handleMouseUp]);
+
+  const canvasBounds = useMemo(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const PAD = 800;
+    for (const e of entities) { const p = positions[e.id]; if (!p) continue; const h = 40 + e.columns.length * 34 + 44; minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x + 310); maxY = Math.max(maxY, p.y + h); }
+    if (!isFinite(minX)) return { width: 1200, height: 800 };
+    return { width: Math.max(maxX - minX + PAD * 2, 1200), height: Math.max(maxY - minY + PAD * 2, 800) };
+  }, [entities, positions]);
+
+  return (
+    <div ref={containerRef}
+      className={`diagram-container absolute inset-0 overflow-hidden diagram-pattern ${isPanning ? 'panning' : ''}`}
+      style={{ cursor: relationMode ? 'crosshair' : undefined }}
+      onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}>
+      <div className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
+        <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ overflow: 'visible', zIndex: 0 }}>
+          <defs>
+            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+          {entities.length > 0 && <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="transparent" stroke="rgba(139,148,158,0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />}
+          {entities.length > 0 && (() => { const c = '#8b949e', o = 0.4, s = 24, g = 4, w = canvasBounds.width, h = canvasBounds.height; return (<g opacity={o} stroke={c} strokeWidth="2" fill="none" style={{ pointerEvents: 'none' }}><path d={`M${g},${g + s} L${g},${g} L${g + s},${g}`} /><path d={`M${w - g - s},${g} L${w - g},${g} L${w - g},${g + s}`} /><path d={`M${g},${h - g - s} L${g},${h - g} L${g + s},${h - g}`} /><path d={`M${w - g - s},${h - g} L${w - g},${h - g} L${w - g},${h - g - s}`} /></g>); })()}
+          {svgLines.map(l => {
+            const isActive = activeRel === l.key; const isHovered = hoveredRel === l.key; const hl = isActive || isHovered;
+            const pathStr = pointsToAngularPath(l.points);
+            return (
+              <g key={l.key}>
+                <path d={pathStr} stroke="transparent" strokeWidth={hl ? 28 : 20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer', transition: 'stroke-width 0.35s ease' }}
+                  onMouseDown={e => { if (isActive) handleLineMouseDown(e, l.key, l.points); else setActiveRel(l.key); }}
+                  onMouseEnter={() => setHoveredRel(l.key)} onMouseLeave={() => setHoveredRel(h => h === l.key ? null : h)} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={hl ? 0.65 : 0.3} fill="none"
+                  markerStart={`url(#${l.startMarker}-marker${hl ? '-hl' : ''})`} markerEnd={`url(#${l.endMarker}-marker${hl ? '-hl' : ''})`}
+                  style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={4} fill="none" filter="url(#glow)" opacity={hl ? 0.3 : 0}
+                  style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 4 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={hl ? 0.7 : 0.4} fill="none"
+                  style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                {(isActive || isHovered) && l.points.map((p, pi) => {
+                  const isEp = pi === 0 || pi === l.points.length - 1;
+                  return (
+                    <g key={`h-${pi}`}>
+                      <circle cx={p.x} cy={p.y} r={isEp ? 4 : 5} fill={isEp ? '#ffffff' : '#c4b5fd'} stroke={isEp ? '#4f46e5' : '#a371f7'} strokeWidth={2} opacity={1}
+                        filter={!isEp ? 'url(#glow)' : undefined} style={{ cursor: 'grab', pointerEvents: 'all' }}
+                        onMouseDown={e => handleWpMouseDown(e, l.key, pi)} onDoubleClick={e => handleWaypointDblClick(e, l.key, pi, l.points)} />
+                      {!isEp && <circle cx={p.x} cy={p.y} r={2.5} fill="#7c3aed" opacity={0.6} style={{ pointerEvents: 'none' }} />}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+        {entities.map(e => (
+          <EntityCard key={e.id} ref={el => entityRefs.current[e.id] = el}
+            entity={e} position={positions[e.id] || { x: 0, y: 0 }} selected={selectedId === e.id}
+            onSelect={() => onRelationClick(e.id)} onDragStart={handleMouseDown} onDelete={onDeleteEntity} onAddColumn={onAddColumn}
+            activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={null}
+            relationMode={relationMode} isRelSrc={relationSource === e.id} isRelTgt={false} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [entities, setEntities] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [relations, setRelations] = useState([]);
+  const [positions, setPositions] = useState({});
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [relationMode, setRelationMode] = useState(false);
+  const [relationSource, setRelationSource] = useState(null);
+  const [showRelations, setShowRelations] = useState(false);
+  const [activeRel, setActiveRel] = useState(null);
+  const [linePaths, setLinePaths] = useState({});
+  const [linePathHistory, setLinePathHistory] = useState({});
+  const entityColors = ['#6366f1','#ec4899','#22c55e','#f59e0b','#06b6d4','#8b5cf6','#f97316','#84cc16'];
+
+  const addEntity = useCallback(() => {
+    const id = uid();
+    const idx = entities.length;
+    setEntities(prev => [...prev, { id, name: `Entidad_${idx + 1}`, columns: [], color: entityColors[idx % entityColors.length] }]);
+    setPositions(prev => ({ ...prev, [id]: { x: 120 + Math.random() * 200, y: 80 + Math.random() * 150 } }));
+    setSelectedId(id);
+  }, [entities.length]);
+
+  const deleteEntity = useCallback((id) => {
+    setEntities(prev => prev.filter(e => e.id !== id));
+    setPositions(prev => { const p = { ...prev }; delete p[id]; return p; });
+    setRelations(prev => prev.filter(r => r.sourceId !== id && r.targetId !== id));
+    setSelectedId(prev => prev === id ? null : prev);
+    setLinePaths(prev => { const np = { ...prev }; for (const k of Object.keys(np)) { const rel = relations.find(r => r.id === k); if (rel && (rel.sourceId === id || rel.targetId === id)) delete np[k]; } return np; });
+  }, [relations]);
+
+  const addColumn = useCallback((eid) => {
+    setEntities(prev => prev.map(e => e.id === eid ? { ...e, columns: [...e.columns, { id: uid(), name: '', type: 'VARCHAR', length: 255, values: '', pk: false, nn: false, uq: false, ai: false }] } : e));
+  }, []);
+
+  const updateColumn = useCallback((eid, colId, upd) => {
+    setEntities(prev => prev.map(e => e.id === eid ? { ...e, columns: e.columns.map(c => c.id === colId ? upd : c) } : e));
+  }, []);
+
+  const deleteColumn = useCallback((eid, colId) => {
+    setEntities(prev => prev.map(e => e.id === eid ? { ...e, columns: e.columns.filter(c => c.id !== colId) } : e));
+  }, []);
+
+  const updateEntityName = useCallback((id, name) => setEntities(prev => prev.map(e => e.id === id ? { ...e, name } : e)), []);
+  const updateEntityColor = useCallback((id, color) => setEntities(prev => prev.map(e => e.id === id ? { ...e, color } : e)), []);
+
+  const selEntity = useMemo(() => entities.find(e => e.id === selectedId) || null, [entities, selectedId]);
+
+  const handleRelationClick = useCallback((entityId) => {
+    if (!relationMode) return;
+    if (!relationSource) { setRelationSource(entityId); return; }
+    if (relationSource === entityId) { setRelationSource(null); return; }
+    const exists = relations.some(r => r.sourceId === relationSource && r.targetId === entityId);
+    if (!exists) {
+      const id = uid();
+      setRelations(prev => [...prev, { id, sourceId: relationSource, targetId: entityId, cardinality: '1:M' }]);
+      setActiveRel(id);
+    }
+    setRelationSource(null);
+    setRelationMode(false);
+  }, [relationMode, relationSource, relations]);
+
+  useEffect(() => { if (!relationMode) setRelationSource(null); }, [relationMode]);
+
+  const handlePositionChange = useCallback((id, x, y) => setPositions(prev => ({ ...prev, [id]: { x, y } })), []);
+
+  const handleLinePathChange = useCallback((key, pts) => setLinePaths(prev => ({ ...prev, [key]: pts })), []);
+
+  const handleResetLinePath = useCallback((key) => {
+    setLinePaths(prev => { const n = { ...prev }; delete n[key]; return n; });
+  }, []);
+
+  const handleSaveLinePathState = useCallback((key) => {
+    setLinePathHistory(prev => {
+      const cur = linePaths[key];
+      if (!cur) return prev;
+      const h = prev[key] || [];
+      return { ...prev, [key]: [...h.slice(-20), cur.map(p => ({ ...p }))] };
+    });
+  }, [linePaths]);
+
+  const handleUndoLinePath = useCallback((key) => {
+    setLinePathHistory(prev => {
+      const h = prev[key];
+      if (!h || h.length === 0) return prev;
+      const restored = h[h.length - 1];
+      const nh = h.slice(0, -1);
+      setLinePaths(p => ({ ...p, [key]: restored }));
+      return { ...prev, [key]: nh.length > 0 ? nh : undefined };
+    });
+  }, []);
+
+  const updateRelation = useCallback((id, upd) => {
+    setRelations(prev => prev.map(r => r.id === id ? { ...r, ...upd } : r));
+  }, []);
+
+  const deleteRelation = useCallback((id) => {
+    setRelations(prev => prev.filter(r => r.id !== id));
+    setActiveRel(prev => prev === id ? null : prev);
+    setLinePaths(prev => { const n = { ...prev }; delete n[id]; return n; });
+  }, []);
+
+  const fitToScreen = useCallback(() => {
+    const container = document.querySelector('.diagram-container');
+    if (!container || entities.length === 0) return;
+    const vals = Object.values(positions).filter(Boolean);
+    if (vals.length === 0) return;
+    const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
+    const maxX = Math.max(...vals.map(p => p.x + 280)), maxY = Math.max(...vals.map(p => { const e = entities.find(ent => positions[ent.id] === p); return p.y + (e ? 40 + e.columns.length * 34 + 44 : 300); }));
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const scale = Math.min(cw / (maxX - minX + 300), ch / (maxY - minY + 200), 1.5);
+    setZoom(Math.max(0.25, Math.min(3, scale)));
+    setPan({ x: (cw - (maxX - minX) * scale) / 2 - minX * scale, y: (ch - (maxY - minY) * scale) / 2 - minY * scale });
+  }, [entities, positions]);
+
+  const firstEntityCount = useRef(0);
+  useEffect(() => {
+    if (entities.length > 0 && firstEntityCount.current === 0) setTimeout(fitToScreen, 50);
+    firstEntityCount.current = entities.length;
+  }, [entities, fitToScreen]);
+
+  return (
+    <div className="h-screen flex flex-col bg-[#0d1117]">
+      <header className="bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 border-b border-[#21262d]/50">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#1f6feb]/20 rounded-lg p-2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="1.5">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              <line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="17.5" x2="14" y2="17.5"/>
+            </svg>
+          </div>
+          <h1 className="text-lg font-bold text-[#c9d1d9]">Diagram Creator</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={addEntity}
+            className="text-[12px] font-medium text-white bg-[#238636]/90 hover:bg-[#2ea043]/90 rounded-lg px-4 h-8 flex items-center gap-1.5 border border-[#3fb950]/30">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+            Entidad
+          </button>
+          <div className="w-px h-5 bg-[#30363d]/40 mx-0.5" />
+          <button onClick={() => { setRelationMode(r => !r); setActiveRel(null); }}
+            className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center gap-1.5 border ${relationMode ? 'text-[#58a6ff] bg-[#1f6feb]/20 border-[#58a6ff]/40' : 'text-[#8b949e] bg-[#21262d]/80 border-[#30363d]/50'}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            Relacionar
+            {relationSource && <span className="text-[9px] text-[#d29922] font-bold ml-1">1/2</span>}
+          </button>
+          <button onClick={() => setShowRelations(s => !s)}
+            className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center gap-1.5 border ${showRelations || relations.length > 0 ? 'text-[#a371f7] bg-[#a371f7]/15 border-[#a371f7]/30' : 'text-[#8b949e] bg-[#21262d]/80 border-[#30363d]/50'}`}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Relaciones{relations.length > 0 && <span className="ml-1 text-[10px] opacity-60">({relations.length})</span>}
+          </button>
+          <div className="w-px h-5 bg-[#30363d]/40 mx-0.5" />
+          <button onClick={fitToScreen} className="text-[#8b949e] bg-[#21262d]/80 rounded-lg w-8 h-8 flex items-center justify-center border border-[#30363d]/50" title="Ajustar">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+          <div className="flex items-center bg-[#21262d]/80 rounded-lg border border-[#30363d]/50">
+            <button onClick={() => setZoom(z => Math.max(0.25, z - 0.1))} className="text-[#8b949e] w-8 h-8 flex items-center justify-center text-lg font-bold border-r border-[#30363d]/50">-</button>
+            <span className="text-[11px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
+            <button onClick={() => setZoom(z => Math.min(3, z + 0.1))} className="text-[#8b949e] w-8 h-8 flex items-center justify-center text-lg font-bold border-l border-[#30363d]/50">+</button>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex-1 flex overflow-hidden relative">
+        <div className="w-[320px] shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30 flex flex-col">
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[13px] font-semibold text-[#c9d1d9] flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                Entidades
+              </h2>
+              <span className="text-[11px] text-[#6e7681]">{entities.length} ent.</span>
+            </div>
+            {entities.length === 0 ? (
+              <div className="flex flex-col items-center py-8 text-[#6e7681]">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mb-2 opacity-50"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <p className="text-[12px]">No hay entidades</p>
+                <p className="text-[11px] mt-0.5">Haz clic en "Entidad" para crear una</p>
+              </div>
+            ) : (
+              entities.map(e => (
+                <div key={e.id} onClick={() => setSelectedId(e.id)}
+                  className={`rounded-lg border cursor-pointer transition-all ${selectedId === e.id ? 'border-[#58a6ff]/50 bg-[#1f6feb]/10' : 'border-[#30363d] bg-[#0d1117] hover:border-[#484f58]'}`}
+                  style={{ borderLeft: `3px solid ${e.color}${selectedId === e.id ? 'cc' : '80'}` }}>
+                  <div className="flex items-center gap-2 px-3 py-2">
+                    <input value={e.name} onChange={ev => updateEntityName(e.id, ev.target.value)}
+                      onClick={ev => ev.stopPropagation()}
+                      className="flex-1 bg-transparent text-[12px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white truncate" />
+                    <input type="color" value={e.color} onChange={ev => { ev.stopPropagation(); updateEntityColor(e.id, ev.target.value); }}
+                      onClick={ev => ev.stopPropagation()} className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0" />
+                    <span className="text-[10px] text-[#6e7681] font-mono">{e.columns.length} col.</span>
+                    <button onClick={ev => { ev.stopPropagation(); deleteEntity(e.id); }} className="text-[#6e7681] hover:text-[#f85149] p-0.5 rounded">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {selEntity && (
+            <div className="border-t border-[#30363d]/50">
+              <div className="px-3 py-2 bg-[#0d1117]/50">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[12px] font-semibold text-[#c9d1d9] flex items-center gap-1.5">
+                    <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: selEntity.color }} />
+                    Columnas de {selEntity.name || 'sin nombre'}
+                  </h3>
+                  <button onClick={() => addColumn(selEntity.id)}
+                    className="text-[10px] font-medium text-[#58a6ff] bg-[#1f6feb]/15 hover:bg-[#1f6feb]/25 rounded px-2 py-1 border border-[#58a6ff]/25">+ Col</button>
+                </div>
+                <div className="max-h-[260px] overflow-y-auto rounded-lg border border-[#30363d]/50 bg-[#0d1117]/80">
+                  {selEntity.columns.length === 0 ? (
+                    <div className="px-3 py-4 text-center"><p className="text-[11px] text-[#6e7681] italic">Sin columnas</p></div>
+                  ) : (
+                    selEntity.columns.map(col => (
+                      <ColumnEditor key={col.id} col={col} onUpdate={(colId, upd) => updateColumn(selEntity.id, colId, upd)} onDelete={(colId) => deleteColumn(selEntity.id, colId)} />
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 relative">
+          <Diagram entities={entities} relations={relations} positions={positions} zoom={zoom} pan={pan}
+            activeRel={activeRel} setActiveRel={setActiveRel}
+            relationMode={relationMode} relationSource={relationSource} onRelationClick={handleRelationClick}
+            onDragStart={(e, id) => {}}
+            onDeleteEntity={deleteEntity} onAddColumn={addColumn}
+            linePaths={linePaths} onUpdateLinePath={handleLinePathChange} onResetLinePath={handleResetLinePath}
+            onSaveLinePathState={handleSaveLinePathState} onUndoLinePath={handleUndoLinePath}
+            onPositionsChange={handlePositionChange} onSetZoom={setZoom} onSetPan={setPan}
+            selectedId={selectedId} onSetSelected={setSelectedId} />
+
+          {activeRel && (() => {
+            const rel = relations.find(r => r.id === activeRel);
+            if (!rel) return null;
+            return <RelationConfig relation={rel} entities={entities} onUpdate={updateRelation} onDelete={deleteRelation} onClose={() => setActiveRel(null)} linePaths={linePaths} onResetLinePath={handleResetLinePath} onUndoLinePath={handleUndoLinePath} />;
+          })()}
+
+          {entities.length > 0 && (
+            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90 backdrop-blur-sm border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
+              <button onClick={() => { setRelationMode(r => !r); setActiveRel(null); }}
+                className={`rounded-lg w-9 h-9 flex items-center justify-center ${relationMode ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#8b949e] bg-[#30363d]/50'}`} title="Modo relación">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+              <button onClick={fitToScreen} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center" title="Ajustar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+              </button>
+              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">-</button>
+              <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
+              <button onClick={() => setZoom(z => Math.min(3, z + 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">+</button>
+            </div>
+          )}
+
+          {relationMode && !relationSource && (
+            <div className="absolute top-4 left-4 bg-[#1f6feb]/20 border border-[#58a6ff]/40 rounded-lg px-3 py-2 text-[12px] text-[#79c0ff] shadow-lg z-20">
+              Selecciona la primera entidad (origen)
+            </div>
+          )}
+          {relationMode && relationSource && (
+            <div className="absolute top-4 left-4 bg-[#d29922]/20 border border-[#d29922]/40 rounded-lg px-3 py-2 text-[12px] text-[#d29922] shadow-lg z-20">
+              Selecciona la segunda entidad (destino)
+            </div>
+          )}
+
+          {showRelations && (
+            <div className="absolute top-0 right-0 w-72 h-full bg-[#161b22] border-l border-[#30363d] z-30 flex flex-col shadow-2xl">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d]/50">
+                <div className="flex items-center gap-2">
+                  <div className="bg-[#a371f7]/10 rounded-lg p-1.5">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a371f7" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                  <h3 className="text-[13px] font-semibold text-[#e6edf3]">Relaciones</h3>
+                </div>
+                <button onClick={() => setShowRelations(false)} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {relations.length === 0 ? (
+                  <div className="flex flex-col items-center py-8 text-[#6e7681]">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-50"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <p className="text-[12px]">No hay relaciones</p>
+                    <p className="text-[11px] mt-0.5">Usa "Relacionar" para conectar entidades</p>
+                  </div>
+                ) : (
+                  relations.map(rel => {
+                    const src = entities.find(e => e.id === rel.sourceId);
+                    const tgt = entities.find(e => e.id === rel.targetId);
+                    const cardLabels = { '1:1': 'Uno a Uno', '1:M': 'Uno a Muchos', 'M:M': 'Muchos a Muchos' };
+                    return (
+                      <div key={rel.id} onClick={() => setActiveRel(rel.id)}
+                        className={`rounded-lg border cursor-pointer p-3 transition-all ${activeRel === rel.id ? 'border-[#58a6ff]/50 bg-[#1f6feb]/10' : 'border-[#30363d] bg-[#0d1117] hover:border-[#484f58]'}`}>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-[12px] font-semibold text-[#c9d1d9] truncate">{src?.name || '?'}</span>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6e7681" strokeWidth="2" className="shrink-0"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                          <span className="text-[12px] font-semibold text-[#c9d1d9] truncate">{tgt?.name || '?'}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] font-mono font-bold text-[#58a6ff] bg-[#1f6feb]/15 rounded px-1.5 py-0.5">{rel.cardinality || '1:M'}</span>
+                          <span className="text-[10px] text-[#6e7681] ml-1">{cardLabels[rel.cardinality] || ''}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>

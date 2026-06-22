@@ -700,17 +700,17 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
 
   const handleLayerMouseDown = useCallback((e, layerId) => {
     if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
-    setActiveLayerId(layerId); if (onShowLayerPanel) onShowLayerPanel(true);
+    setActiveLayerId(layerId);
     layerDragRef.current = { layerId, startX: e.clientX, startY: e.clientY, origX: layer.x, origY: layer.y, moved: false };
     document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [layers, handleMouseMove, handleMouseUp, onShowLayerPanel]);
+  }, [layers, handleMouseMove, handleMouseUp]);
 
   const handleLayerResizeDown = useCallback((e, layerId, sx, sy) => {
     if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
-    setActiveLayerId(layerId); if (onShowLayerPanel) onShowLayerPanel(true);
+    setActiveLayerId(layerId);
     layerResizeRef.current = { layerId, startX: e.clientX, startY: e.clientY, sx, sy, origX: layer.x, origY: layer.y, origW: layer.w, origH: layer.h };
     document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [layers, handleMouseMove, handleMouseUp, onShowLayerPanel]);
+  }, [layers, handleMouseMove, handleMouseUp]);
 
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
@@ -818,25 +818,25 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             const hasCustomPath = linePaths && linePaths[l.key];
             return (
               <g key={l.key}>
-                <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseFk(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseFk(null), 2400); }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease, stroke-width 0.25s ease' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={3.5} strokeLinecap="butt" strokeLinejoin="miter" fill="none" filter="url(#glow)" opacity={highlight ? 0.7 : 0} style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 1 : 0.5} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.25s ease, stroke-width 0.25s ease' }} />
+                <path d={pathStr} stroke="transparent" strokeWidth={highlight ? 28 : 20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer', transition: 'stroke-width 0.35s ease' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseFk(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseFk(null), 2400); }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={highlight ? 0.65 : 0.3} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" opacity={highlight ? 0.3 : 0} style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 4 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={highlight ? 0.7 : 0.4} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
 
                 {(isActive || isHovered) && l.points.map((p, pi) => {
                   const isEndpoint = pi === 0 || pi === l.points.length - 1;
                   return (
                     <g key={`h-${pi}`}>
-                      <circle cx={p.x} cy={p.y} r={isEndpoint ? 6 : 8}
+                      <circle cx={p.x} cy={p.y} r={isEndpoint ? 4 : 5}
                         fill={isEndpoint ? '#ffffff' : '#c4b5fd'}
                         stroke={isEndpoint ? '#4f46e5' : '#a371f7'}
-                        strokeWidth={isEndpoint ? 2 : 2.5} opacity={1}
+                        strokeWidth={isEndpoint ? 1.5 : 2} opacity={1}
                         filter={!isEndpoint ? 'url(#glow)' : undefined}
                         style={{ cursor: isEndpoint ? 'grab' : 'grab', pointerEvents: 'all' }}
                         onMouseDown={e => handleWaypointHandleMouseDown(e, l.key, pi)}
                         onDoubleClick={e => handleWaypointDoubleClick(e, l.key, pi, l.points)} />
                       {!isEndpoint && (
-                        <circle cx={p.x} cy={p.y} r={4}
+                        <circle cx={p.x} cy={p.y} r={2.5}
                           fill="#7c3aed" opacity={0.6}
                           style={{ pointerEvents: 'none' }} />
                       )}
@@ -1316,23 +1316,37 @@ function App() {
   const [showCategories, setShowCategories] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [sortFitKey, setSortFitKey] = useState(0);
+  const [showAddRel, setShowAddRel] = useState(false);
+  const [addRelForm, setAddRelForm] = useState({ sourceId: '', targetId: '', cardinality: 'M:1' });
   const parseTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const issues = useMemo(() => detectIssues(tables, positions), [tables, positions]);
 
   const syncSqlToTables = useCallback((value) => {
-    value = stripSQLComments(value); setSql(value); setError(null);
+    setSql(value); setError(null);
     if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current);
     parseTimeoutRef.current = setTimeout(() => {
       try {
-        if (!value.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setTableCategory({}); return; }
-        const parsed = parseSQL(value);
-        if (parsed.length === 0 && value.trim()) { setError('No se detectaron tablas.'); return; }
-        const sorted = sortTablesByRelations(parsed); setPositions(autoLayout(sorted)); setTables(sorted); setSelectedTables({}); setError(null);
+        const clean = stripSQLComments(value);
+        if (!clean.trim()) { setTables([]); setSelectedTables({}); setPositions({}); setLayers([]); setTableCategory({}); return; }
+        const parsed = parseSQL(clean);
+        if (parsed.length === 0 && clean.trim()) { setError('No se detectaron tablas.'); return; }
+        const sorted = sortTablesByRelations(parsed);
+        setPositions(prev => {
+          const newPos = {};
+          const auto = autoLayout(sorted);
+          for (const t of sorted) {
+            const oldT = tables.find(pt => pt.name === t.name);
+            if (oldT && prev[oldT.id]) newPos[t.id] = prev[oldT.id];
+            else if (auto[t.id]) newPos[t.id] = auto[t.id];
+          }
+          return newPos;
+        });
+        setTables(sorted); setSelectedTables({}); setError(null);
       } catch (e) { setError('Error: ' + e.message); }
-    }, 400);
-  }, []);
+    }, 800);
+  }, [tables]);
 
   useEffect(() => { return () => { if (parseTimeoutRef.current) clearTimeout(parseTimeoutRef.current); }; }, []);
 
@@ -1448,12 +1462,138 @@ CREATE TABLE pedido_productos (
   }, [tables, commitTables]);
 
   const updateRef = useCallback((tableId, column, refTable, cardinality) => {
+    if (cardinality === 'M:M') {
+      const srcTable = tables.find(t => t.id === tableId);
+      const tgtTable = tables.find(t => t.name === refTable);
+      if (!srcTable || !tgtTable || srcTable.name === tgtTable.name) return;
+
+      const sorted = [srcTable.name, tgtTable.name].sort();
+      const junctionName = `${sorted[0]}_${sorted[1]}`;
+
+      if (tables.some(t => t.name === junctionName)) return;
+
+      const srcPk = srcTable.columns.find(c => c.pk);
+      const tgtPk = tgtTable.columns.find(c => c.pk);
+      if (!srcPk || !tgtPk) return;
+
+      const srcColName = `${toSnakeCase(srcTable.name)}_id`;
+      const tgtColName = `${toSnakeCase(tgtTable.name)}_id`;
+
+      const mkCol = (name, type, pk, nn, ai, fk, rTable, rCol) => ({
+        id: uid(), name, type, length: null, values: '',
+        pk, nn, uq: false, ai, fk, refTable: rTable, refColumn: rCol, defaultValue: ''
+      });
+
+      const junctionTable = {
+        id: uid(),
+        name: junctionName,
+        columns: [
+          mkCol('id', 'INT', true, true, true, false, '', ''),
+          mkCol(srcColName, 'INT', false, true, false, true, srcTable.name, srcPk.name),
+          mkCol(tgtColName, 'INT', false, true, false, true, tgtTable.name, tgtPk.name),
+        ],
+        refs: [
+          { column: srcColName, refTable: srcTable.name, refColumn: srcPk.name, cardinality: 'M:1' },
+          { column: tgtColName, refTable: tgtTable.name, refColumn: tgtPk.name, cardinality: 'M:1' },
+        ],
+        color: TABLE_COLORS[tables.length % TABLE_COLORS.length]
+      };
+
+      const nextTables = tables.map(t => {
+        if (t.id === tableId) {
+          return { ...t, refs: (t.refs || []).filter(r => !(r.column === column && r.refTable === refTable)) };
+        }
+        if (t.name === refTable) {
+          return { ...t, refs: (t.refs || []).filter(r => !(r.refTable === srcTable.name && r.cardinality === 'M:M')) };
+        }
+        return t;
+      });
+      nextTables.push(junctionTable);
+
+      setPositions(prev => {
+        const srcPos = prev[tableId];
+        const tgtId = tables.find(t => t.name === refTable)?.id;
+        const tgtPos = tgtId ? prev[tgtId] : null;
+        if (srcPos && tgtPos) {
+          const midX = (srcPos.x + tgtPos.x) / 2;
+          const midY = (srcPos.y + tgtPos.y) / 2;
+          return { ...prev, [junctionTable.id]: { x: midX, y: midY + 50 } };
+        }
+        return { ...prev, [junctionTable.id]: { x: 200, y: 200 } };
+      });
+
+      commitTables(nextTables);
+      return;
+    }
+
     const next = tables.map(t => {
       if (t.id !== tableId) return t;
       return { ...t, refs: (t.refs || []).map(r => r.column === column && r.refTable === refTable ? { ...r, cardinality } : r) };
     });
     commitTables(next);
   }, [tables, commitTables]);
+
+  const handleAddRelation = useCallback(() => {
+    const { sourceId, targetId, cardinality } = addRelForm;
+    if (!sourceId || !targetId) return;
+    const srcTable = tables.find(t => t.id === sourceId);
+    const tgtTable = tables.find(t => t.id === targetId);
+    if (!srcTable || !tgtTable || srcTable.name === tgtTable.name) return;
+
+    if (cardinality === 'M:M') {
+      const sorted = [srcTable.name, tgtTable.name].sort();
+      const junctionName = `${sorted[0]}_${sorted[1]}`;
+      if (tables.some(t => t.name === junctionName)) { setShowAddRel(false); return; }
+      const srcPk = srcTable.columns.find(c => c.pk);
+      const tgtPk = tgtTable.columns.find(c => c.pk);
+      if (!srcPk || !tgtPk) return;
+
+      const srcColName = `${toSnakeCase(srcTable.name)}_id`;
+      const tgtColName = `${toSnakeCase(tgtTable.name)}_id`;
+      const mkCol = (name, type, pk, nn, ai, fk, rTable, rCol) => ({
+        id: uid(), name, type, length: null, values: '',
+        pk, nn, uq: false, ai, fk, refTable: rTable, refColumn: rCol, defaultValue: ''
+      });
+      const junctionTable = {
+        id: uid(), name: junctionName,
+        columns: [
+          mkCol('id', 'INT', true, true, true, false, '', ''),
+          mkCol(srcColName, 'INT', false, true, false, true, srcTable.name, srcPk.name),
+          mkCol(tgtColName, 'INT', false, true, false, true, tgtTable.name, tgtPk.name),
+        ],
+        refs: [
+          { column: srcColName, refTable: srcTable.name, refColumn: srcPk.name, cardinality: 'M:1' },
+          { column: tgtColName, refTable: tgtTable.name, refColumn: tgtPk.name, cardinality: 'M:1' },
+        ],
+        color: TABLE_COLORS[tables.length % TABLE_COLORS.length]
+      };
+      const nextTables = [...tables, junctionTable];
+      setPositions(prev => {
+        const srcPos = prev[sourceId], tgtPos = prev[targetId];
+        if (srcPos && tgtPos) return { ...prev, [junctionTable.id]: { x: (srcPos.x + tgtPos.x) / 2, y: (srcPos.y + tgtPos.y) / 2 + 50 } };
+        return { ...prev, [junctionTable.id]: { x: 200, y: 200 } };
+      });
+      commitTables(nextTables);
+    } else {
+      const fkColName = `${toSnakeCase(tgtTable.name)}_id`;
+      const tgtPk = tgtTable.columns.find(c => c.pk) || tgtTable.columns[0];
+      if (!tgtPk) { setShowAddRel(false); return; }
+
+      const nextTables = tables.map(t => {
+        if (t.id !== sourceId) return t;
+        const fkCol = t.columns.find(c => c.name === fkColName);
+        const columns = fkCol
+          ? t.columns.map(c => c.name === fkColName ? { ...c, fk: true } : c)
+          : [...t.columns, { id: uid(), name: fkColName, type: tgtPk.type, length: tgtPk.length || null, values: '', pk: false, nn: false, uq: false, ai: false, fk: true, refTable: tgtTable.name, refColumn: tgtPk.name, defaultValue: '' }];
+        const exists = (t.refs || []).some(r => r.column === fkColName && r.refTable === tgtTable.name);
+        if (exists) return { ...t, columns };
+        return { ...t, columns, refs: [...(t.refs || []), { column: fkColName, refTable: tgtTable.name, refColumn: tgtPk.name, cardinality }] };
+      });
+      commitTables(nextTables);
+    }
+    setShowAddRel(false);
+    setAddRelForm({ sourceId: '', targetId: '', cardinality: 'M:1' });
+  }, [tables, addRelForm, commitTables]);
 
   const handleZoomOrPos = useCallback((tid, key, val) => {
     if (key === null && val === null) return;
@@ -1646,8 +1786,8 @@ CREATE TABLE pedido_productos (
         </div>
 
         <button onClick={() => setShowLeft(!showLeft)}
-          className="absolute top-3 z-20 bg-[#21262d]/90 border border-[#30363d]/60 rounded-r-lg p-2    shadow-lg "
-          style={{ left: showLeft ? '460px' : '0' }}
+          className="absolute z-20 bg-[#21262d]/90 border border-[#30363d]/60 rounded-r-lg p-2 shadow-lg"
+          style={{ left: showLeft ? '460px' : '0', top: '3px' }}
           title={showLeft ? 'Ocultar panel (Ctrl+B)' : 'Mostrar panel (Ctrl+B)'}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8b949e]  ">
             <path d={showLeft ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
@@ -1656,7 +1796,7 @@ CREATE TABLE pedido_productos (
 
         <button onClick={handleLoadDemo}
           className="absolute z-20 bg-[#238636]/20 border border-[#3fb950]/30 rounded-r-lg p-2 shadow-lg hover:bg-[#238636]/30"
-          style={{ left: showLeft ? '460px' : '0', top: '52px' }}
+          style={{ left: showLeft ? '460px' : '0', top: '57px' }}
           title="Cargar SQL de ejemplo">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#3fb950]">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -1666,6 +1806,58 @@ CREATE TABLE pedido_productos (
             <line x1="11" y1="17" x2="13" y2="17"/>
           </svg>
         </button>
+
+        <button onClick={() => setShowAddRel(s => !s)}
+          className="absolute z-20 bg-[#1f6feb]/20 border border-[#58a6ff]/30 rounded-r-lg p-2 shadow-lg hover:bg-[#1f6feb]/30"
+          style={{ left: showLeft ? '460px' : '0', top: '111px' }}
+          title="Añadir relación manual">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]">
+            <line x1="5" y1="12" x2="19" y2="12"/><line x1="12" y1="5" x2="12" y2="19"/>
+            <path d="M5 12h2M17 12h2M12 5v2M12 17v2" strokeWidth="1.5"/>
+            <circle cx="12" cy="12" r="2.5" fill="none"/>
+          </svg>
+        </button>
+
+        {showAddRel && (
+          <div className="absolute z-30 bg-[#1c2128]/95 border border-[#58a6ff]/40 rounded-xl shadow-2xl p-4"
+            style={{ left: showLeft ? '496px' : '36px', top: '90px', width: '260px' }}>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[12px] font-semibold text-[#e6edf3]">Añadir relación</span>
+              <button onClick={() => setShowAddRel(false)} className="text-[#6e7681] hover:text-[#c9d1d9]"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+            <div className="space-y-2.5">
+              <div>
+                <label className="text-[10px] text-[#8b949e] font-medium">Tabla origen</label>
+                <select value={addRelForm.sourceId} onChange={e => setAddRelForm(f => ({ ...f, sourceId: e.target.value }))}
+                  className="w-full bg-[#0d1117] text-[12px] text-[#c9d1d9] border border-[#30363d] rounded px-2 py-1.5 focus:outline-none focus:border-[#58a6ff]/50 mt-0.5">
+                  <option value="">Seleccionar...</option>
+                  {tables.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#8b949e] font-medium">Tabla destino</label>
+                <select value={addRelForm.targetId} onChange={e => setAddRelForm(f => ({ ...f, targetId: e.target.value }))}
+                  className="w-full bg-[#0d1117] text-[12px] text-[#c9d1d9] border border-[#30363d] rounded px-2 py-1.5 focus:outline-none focus:border-[#58a6ff]/50 mt-0.5">
+                  <option value="">Seleccionar...</option>
+                  {tables.filter(t => t.id !== addRelForm.sourceId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-[#8b949e] font-medium">Cardinalidad</label>
+                <div className="flex gap-1 mt-1">
+                  {['M:1', '1:1', '1:M', 'M:M'].map(c => (
+                    <button key={c} onClick={() => setAddRelForm(f => ({ ...f, cardinality: c }))}
+                      className={`text-[10px] font-mono font-bold px-2 py-1 rounded border flex-1 ${addRelForm.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681]'}`}>{c}</button>
+                  ))}
+                </div>
+              </div>
+              <button onClick={handleAddRelation}
+                className="w-full text-[11px] font-semibold bg-[#238636] hover:bg-[#2ea043] text-white rounded-lg py-1.5 mt-1 transition-colors">
+                Añadir
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 flex flex-col overflow-hidden ">
           <div className="flex-1 relative flex overflow-hidden">

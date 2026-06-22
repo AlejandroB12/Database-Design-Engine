@@ -14,6 +14,10 @@ app.mount("/images", StaticFiles(directory="assets/images"), name="images")
 async def index():
     return FileResponse("frontend/views/diagram-generator", media_type="text/html")
 
+@app.get("/creador")
+async def creador():
+    return FileResponse("frontend/views/diagram-creator", media_type="text/html")
+
 @app.get("/login")
 async def login():
     return FileResponse("frontend/views/login.html", media_type="text/html")

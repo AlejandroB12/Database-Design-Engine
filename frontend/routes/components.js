@@ -585,17 +585,17 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
 
   const handleLayerMouseDown = useCallback((e, layerId) => {
     if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
-    setActiveLayerId(layerId); if (onShowLayerPanel) onShowLayerPanel(true);
+    setActiveLayerId(layerId);
     layerDragRef.current = { layerId, startX: e.clientX, startY: e.clientY, origX: layer.x, origY: layer.y, moved: false };
     document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [layers, handleMouseMove, handleMouseUp, onShowLayerPanel]);
+  }, [layers, handleMouseMove, handleMouseUp]);
 
   const handleLayerResizeDown = useCallback((e, layerId, sx, sy) => {
     if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
-    setActiveLayerId(layerId); if (onShowLayerPanel) onShowLayerPanel(true);
+    setActiveLayerId(layerId);
     layerResizeRef.current = { layerId, startX: e.clientX, startY: e.clientY, sx, sy, origX: layer.x, origY: layer.y, origW: layer.w, origH: layer.h };
     document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [layers, handleMouseMove, handleMouseUp, onShowLayerPanel]);
+  }, [layers, handleMouseMove, handleMouseUp]);
 
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
