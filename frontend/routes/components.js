@@ -134,7 +134,7 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pul
   const tc = typeColor[col.type] || '#8b949e';
   return (
     <div className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${isHighlight ? 'bg-[#1f6feb]/12' : pulseCls || 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
-      style={{ height: 34, borderLeft: accentColor ? `2px solid ${accentColor}60` : '2px solid transparent' }}>
+      style={{ height: 34, borderLeft: '2px solid transparent' }}>
       <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
         style={{
           color: isHighlight ? '#ffffff' : tc,
@@ -161,18 +161,20 @@ function ColumnBadge({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pul
             }}>FK</span>
         )}
         {col.nn && (
-          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
-            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }}>
-            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#f85149' }} />
-            NN
-          </span>
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: '#f85149',
+              background: '#f8514918',
+              border: '1px solid #f8514935'
+            }}>NN</span>
         )}
         {col.ai && (
-          <span className="flex items-center gap-[2px] text-[9px] font-semibold leading-none"
-            style={{ color: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }}>
-            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: isHighlight ? 'rgba(255,255,255,0.6)' : '#3fb950' }} />
-            AI
-          </span>
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{
+              color: '#3fb950',
+              background: '#3fb95018',
+              border: '1px solid #3fb95035'
+            }}>AI</span>
         )}
       </div>
     </div>
