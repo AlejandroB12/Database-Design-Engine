@@ -4,7 +4,7 @@ const PAD = 60;
 let exportPending = false;
 
 function yieldToBrowser() {
-  return new Promise(resolve => setTimeout(resolve, 10));
+  return new Promise(resolve => setTimeout(resolve, 4));
 }
 
 function showLoadingOverlay() {
@@ -59,6 +59,8 @@ function computeBounds() {
   return { minX, minY, maxX, maxY, w: maxX - minX + PAD * 2, h: maxY - minY + PAD * 2 };
 }
 
+const TYPE_COLOR_MAP = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+
 function getCardData(card) {
   const left = parseFloat(card.style.left) || 0;
   const top = parseFloat(card.style.top) || 0;
@@ -78,37 +80,33 @@ function getCardData(card) {
 
   const headerH = header ? header.offsetHeight || 36 : 36;
 
-  const colBadges = Array.from(card.querySelectorAll('[data-col-badge="true"]'));
-  const columns = colBadges.map(el => {
+  const colBadges = card.querySelectorAll('[data-col-badge="true"]');
+  const columns = [];
+  for (const el of colBadges) {
     const spans = el.querySelectorAll('span');
-    const typeEl = spans[0];
-    const nameEl = spans[1];
-    const type = typeEl ? typeEl.textContent.trim() : '';
-    const name = nameEl ? nameEl.textContent.trim() : '';
+    const type = spans[0] ? spans[0].textContent.trim() : '';
+    const name = spans[1] ? spans[1].textContent.trim() : '';
     let isPk = false, isFk = false, isUq = false, isNn = false, isAi = false;
     const constraintDiv = el.querySelector('[class*="shrink-0"]');
     if (constraintDiv) {
-      constraintDiv.childNodes.forEach(node => {
+      for (const node of constraintDiv.childNodes) {
         if (node.nodeType === 1) {
           const t = node.textContent.trim();
           if (t === 'PK') isPk = true;
-          if (t === 'FK') isFk = true;
-          if (t === 'UQ') isUq = true;
-          if (t === 'NN') isNn = true;
-          if (t === 'AI') isAi = true;
+          else if (t === 'FK') isFk = true;
+          else if (t === 'UQ') isUq = true;
+          else if (t === 'NN') isNn = true;
+          else if (t === 'AI') isAi = true;
         }
-      });
+      }
     }
     const hasAccent = isPk || isFk || isUq;
     let accentColor = null;
     if (isPk) accentColor = '#d29922';
     else if (isFk) accentColor = '#a371f7';
     else if (isUq) accentColor = '#58a6ff';
-    let typeColor = '#8b949e';
-    const typeColorMap = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
-    if (typeColorMap[type]) typeColor = typeColorMap[type];
-    return { type, name, isPk, isFk, isUq, isNn, isAi, hasAccent, accentColor, typeColor, offsetY: el.offsetTop };
-  });
+    columns.push({ type, name, isPk, isFk, isUq, isNn, isAi, hasAccent, accentColor, typeColor: TYPE_COLOR_MAP[type] || '#8b949e', offsetY: el.offsetTop });
+  }
 
   return { left, top, w, h, tableName, colCount, tableColor, columns, headerH };
 }
@@ -353,10 +351,10 @@ async function captureDiagram(options = {}) {
   // Collect card data
   const cardsData = Array.from(cardEls).map(card => getCardData(card));
 
-  // Draw cards
-  for (const data of cardsData) {
-    await yieldToBrowser();
-    drawCard(ctx, data, tableColor);
+  // Draw cards (yield every 3 to unblock UI)
+  for (let i = 0; i < cardsData.length; i++) {
+    if (i % 3 === 0) await yieldToBrowser();
+    drawCard(ctx, cardsData[i], tableColor);
   }
 
   return outCanvas;

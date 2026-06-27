@@ -20,8 +20,10 @@ function segmentsCross(p1, p2, p3, p4) {
   return t > 0 && t < 1 && u > 0 && u < 1;
 }
 
+function tableHeight(t) { return 40 + t.columns.length * 34 + 44; }
+
 function getTableRect(t, pos) {
-  return { x: pos.x, y: pos.y, w: 310, h: 40 + t.columns.length * 34 + 44 };
+  return { x: pos.x, y: pos.y, w: 310, h: tableHeight(t) };
 }
 
 function detectIssues(tables, positions) {
@@ -36,22 +38,25 @@ function detectIssues(tables, positions) {
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
       if (rectsOverlap(rects[ids[i]], rects[ids[j]])) {
-        const ti = tables.find(t => t.id === ids[i]);
-        const tj = tables.find(t => t.id === ids[j]);
-        overlaps.push({ a: ti?.name || ids[i], b: tj?.name || ids[j] });
+        overlaps.push({ a: ids[i], b: ids[j] });
       }
     }
   }
+  const tableById = {}; for (const t of tables) tableById[t.id] = t;
+  const tableByName = {}; for (const t of tables) tableByName[t.name] = t;
+  const colIdxCache = {};
   const lines = [];
+  const colH = 34, headerH = 40;
   for (const t of tables) {
     const p = positions[t.id];
     if (!p) continue;
+    if (!colIdxCache[t.id]) { const m = {}; t.columns.forEach((c, i) => { m[c.name] = i; }); colIdxCache[t.id] = m; }
     for (const ref of (t.refs || [])) {
-      const tgt = tables.find(t2 => t2.name === ref.refTable);
+      const tgt = tableByName[ref.refTable];
       if (!tgt || !positions[tgt.id]) continue;
-      const colH = 34, headerH = 40;
-      const srcIdx = t.columns.findIndex(c => c.name === ref.column);
-      const tgtIdx = tgt.columns.findIndex(c => c.name === ref.refColumn);
+      if (!colIdxCache[tgt.id]) { const m = {}; tgt.columns.forEach((c, i) => { m[c.name] = i; }); colIdxCache[tgt.id] = m; }
+      const srcIdx = colIdxCache[t.id][ref.column];
+      const tgtIdx = colIdxCache[tgt.id][ref.refColumn];
       const sx = p.x + 155;
       const sy = p.y + headerH + (srcIdx >= 0 ? srcIdx * colH + colH / 2 : colH / 2);
       const tx = positions[tgt.id].x + 155;
@@ -72,7 +77,8 @@ function detectIssues(tables, positions) {
 function autoLayout(tables) {
   if (!tables.length) return {};
   const positions = {}; const byName = {};
-  for (const t of tables) byName[t.name] = t.id;
+  const tableByName = {};
+  for (const t of tables) { byName[t.name] = t.id; tableByName[t.name] = t; }
   const graph = {};
   for (const t of tables) {
     if (!graph[t.name]) graph[t.name] = { refs: [], refdBy: [] };
@@ -92,17 +98,18 @@ function autoLayout(tables) {
   let globalY = 30;
   for (let ci = 0; ci < components.length; ci++) {
     const comp = components[ci];
-    const roots = comp.filter(n => { const g = graph[n]; return !g || !g.refs.some(r => comp.includes(r)); });
+    const compSet = new Set(comp);
+    const roots = comp.filter(n => { const g = graph[n]; return !g || !g.refs.some(r => compSet.has(r)); });
     const layers = {}; const queue = [];
     for (const r of roots.length ? roots : [comp[0]]) { layers[r] = 0; queue.push(r); }
-    while (queue.length) { const cur = queue.shift(); const g = graph[cur]; if (!g) continue; for (const child of g.refdBy) { if (!comp.includes(child)) continue; const nl = layers[cur] + 1; if (layers[child] === undefined || layers[child] < nl) { layers[child] = nl; queue.push(child); } } }
+    while (queue.length) { const cur = queue.shift(); const g = graph[cur]; if (!g) continue; for (const child of g.refdBy) { if (!compSet.has(child)) continue; const nl = layers[cur] + 1; if (layers[child] === undefined || layers[child] < nl) { layers[child] = nl; queue.push(child); } } }
     for (const n of comp) { if (layers[n] === undefined) layers[n] = 0; }
     const byLayer = {}; let maxLayer = 0;
     for (const n of comp) { const l = layers[n] || 0; if (!byLayer[l]) byLayer[l] = []; byLayer[l].push(n); maxLayer = Math.max(maxLayer, l); }
     const tableHs = {};
-    for (const n of comp) { const t = tables.find(t => t.name === n); tableHs[n] = t ? 40 + t.columns.length * 34 + 44 : 200; }
+    for (const n of comp) { const t = tableByName[n]; tableHs[n] = t ? tableHeight(t) : 200; }
     const rowH = Math.max(rowGap + 74, ...comp.map(n => tableHs[n] + rowGap));
-    for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l]; if (l === 0) continue; names.sort((a, b) => { const pa = (graph[a]?.refs || []).filter(r => comp.includes(r))[0] || ''; const pb = (graph[b]?.refs || []).filter(r => comp.includes(r))[0] || ''; return (byLayer[l - 1] || []).indexOf(pa) - (byLayer[l - 1] || []).indexOf(pb); }); }
+    for (let l = 0; l <= maxLayer; l++) { const names = byLayer[l]; if (l === 0) continue; const prevLayer = byLayer[l - 1] || []; names.sort((a, b) => { const pa = (graph[a]?.refs || []).filter(r => compSet.has(r))[0] || ''; const pb = (graph[b]?.refs || []).filter(r => compSet.has(r))[0] || ''; return prevLayer.indexOf(pa) - prevLayer.indexOf(pb); }); }
     let maxCols = 0; for (let l = 0; l <= maxLayer; l++) maxCols = Math.max(maxCols, (byLayer[l] || []).length);
     const colW = cardW + colGap;
     const compW = maxCols * colW - colGap; const compH = (maxLayer + 1) * rowH - rowGap;
@@ -116,7 +123,9 @@ function autoLayout(tables) {
 function arrangeTables(tables, positions) {
   const newPos = {};
   const byName = {};
-  for (const t of tables) byName[t.name] = t.id;
+  const tableById = {};
+  const tableByName = {};
+  for (const t of tables) { byName[t.name] = t.id; tableById[t.id] = t; tableByName[t.name] = t; }
   const graph = {};
   for (const t of tables) {
     if (!graph[t.name]) graph[t.name] = { refs: [], refdBy: [] };
@@ -141,19 +150,19 @@ function arrangeTables(tables, positions) {
     }
     components.push(comp);
   }
-  const cardW = 310;
   const colGap = 80; const rowGap = 100;
   let globalY = 30;
   for (let ci = 0; ci < components.length; ci++) {
     const compNames = components[ci];
+    const compSet = new Set(compNames);
     const layers = {}; const queue = [];
-    const roots = compNames.filter(n => { const g = graph[n]; return !g || !g.refs.some(r => compNames.includes(r)); });
+    const roots = compNames.filter(n => { const g = graph[n]; return !g || !g.refs.some(r => compSet.has(r)); });
     for (const r of roots.length ? roots : [compNames[0]]) { layers[r] = 0; queue.push(r); }
     while (queue.length) {
       const cur = queue.shift(); const g = graph[cur];
       if (!g) continue;
       for (const child of g.refdBy) {
-        if (!compNames.includes(child)) continue;
+        if (!compSet.has(child)) continue;
         const nl = layers[cur] + 1;
         if (layers[child] === undefined || layers[child] < nl) { layers[child] = nl; queue.push(child); }
       }
@@ -165,15 +174,17 @@ function arrangeTables(tables, positions) {
       if (!byLayer[l]) byLayer[l] = []; byLayer[l].push(n);
       maxLayer = Math.max(maxLayer, l);
     }
+    const prevBc = { names: [], idxMap: {} };
     for (let l = 1; l <= maxLayer; l++) {
       const prevLayer = byLayer[l - 1] || [];
       const curLayer = byLayer[l] || [];
+      if (prevBc.names !== prevLayer) { prevBc.names = prevLayer; prevBc.idxMap = {}; prevLayer.forEach((n, i) => { prevBc.idxMap[n] = i; }); }
       const barycenters = curLayer.map(name => {
         const g = graph[name];
-        const preds = (g?.refs || []).filter(r => compNames.includes(r));
+        const preds = (g?.refs || []).filter(r => compSet.has(r));
         if (preds.length === 0) return { name, bc: -1 };
         let sum = 0;
-        for (const p of preds) { const idx = prevLayer.indexOf(p); if (idx >= 0) sum += idx; }
+        for (const p of preds) { const idx = prevBc.idxMap[p]; if (idx !== undefined) sum += idx; }
         return { name, bc: sum / preds.length };
       });
       barycenters.sort((a, b) => a.bc - b.bc);
@@ -181,7 +192,7 @@ function arrangeTables(tables, positions) {
     }
     let maxCols = 0;
     for (let l = 0; l <= maxLayer; l++) maxCols = Math.max(maxCols, (byLayer[l] || []).length);
-    const rowH = Math.max(rowGap, ...compNames.map(n => { const t = tables.find(t => t.name === n); return t ? 40 + t.columns.length * 34 + 44 + rowGap : rowGap; }));
+    const rowH = Math.max(rowGap, ...compNames.map(n => (tableByName[n] ? tableHeight(tableByName[n]) + rowGap : rowGap)));
     for (let l = 0; l <= maxLayer; l++) {
       const names = byLayer[l] || [];
       const layerW = names.length * colGap;
@@ -189,8 +200,8 @@ function arrangeTables(tables, positions) {
       names.forEach((name, i) => {
         const id = byName[name];
         if (id) {
-          const t = tables.find(t => t.id === id);
-          const yOff = (rowH - (t ? 40 + t.columns.length * 34 + 44 : 200)) / 2;
+          const t = tableById[id];
+          const yOff = (rowH - (t ? tableHeight(t) : 200)) / 2;
           newPos[id] = { x: startX + i * colGap, y: globalY + l * rowH + yOff };
         }
       });
@@ -206,11 +217,11 @@ function arrangeTables(tables, positions) {
           for (let j = i + 1; j < names.length; j++) {
             const idA = byName[names[i]], idB = byName[names[j]];
             if (!idA || !idB || !newPos[idA] || !newPos[idB]) continue;
-            const tA = tables.find(t => t.id === idA), tB = tables.find(t => t.id === idB);
+            const tA = tableById[idA], tB = tableById[idB];
             if (!tA || !tB) continue;
             const rA = getTableRect(tA, newPos[idA]);
             const rB = getTableRect(tB, newPos[idB]);
-            if (rectsOverlap(rA, rB)) { anyOverlap = true; newPos[idB] = { x: newPos[idB].x + cardW / 2, y: newPos[idB].y + 20 }; }
+            if (rectsOverlap(rA, rB)) { anyOverlap = true; newPos[idB] = { x: newPos[idB].x + 155, y: newPos[idB].y + 20 }; }
           }
         }
       }

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Database Modeler</title>
+  <title>Diagram Generator</title>
   <script src="lib/tailwind.js"></script>
   <script src="lib/react.production.min.js"></script>
   <script src="lib/react-dom.production.min.js"></script>
@@ -377,6 +377,11 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
   const prevTableCount = useRef(0);
   const prevShowLeft = useRef(showLeft);
   const prevFitKey = useRef(0);
+  const tableByIdRef = useRef({});
+  const tableByNameRef = useRef({});
+  const columnIdxRef = useRef({});
+  const routeCacheRef = useRef({});
+
   const fitToScreen = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -384,8 +389,8 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     if (vals.length === 0) return;
     const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
     const maxX = Math.max(...vals.map(p => p.x + 310)), maxY = Math.max(...vals.map(p => {
-      const t = tables.find(t => positions[t.id] === p);
-      return p.y + (t ? 40 + t.columns.length * 34 + 44 : 300);
+      const t = tableByIdRef.current[Object.keys(positions).find(k => positions[k] === p)];
+      return p.y + (t ? tableHeight(t) : 300);
     }));
     const cw = container.clientWidth, ch = container.clientHeight;
     const pad = 40;
@@ -393,7 +398,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     const clamped = Math.max(0.25, Math.min(3, scale));
     onUpdateTable(null, null, { abs: clamped });
     setPan({ x: (cw - (maxX - minX) * clamped) / 2 - minX * clamped, y: (ch - (maxY - minY) * clamped) / 2 - minY * clamped });
-  }, [tables, positions, onUpdateTable]);
+  }, [positions, onUpdateTable]);
 
   useEffect(() => {
     const isFirst = prevTableCount.current === 0 && tables.length > 0;
@@ -413,6 +418,15 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     return map;
   }, [tables]);
 
+  useMemo(() => {
+    const byId = {}; const byName = {};
+    for (const t of tables) { byId[t.id] = t; byName[t.name] = t; }
+    tableByIdRef.current = byId;
+    tableByNameRef.current = byName;
+    const colIdx = {}; for (const t of tables) { const m = {}; t.columns.forEach((c, i) => { m[c.name] = i; }); colIdx[t.id] = m; }
+    columnIdxRef.current = colIdx;
+  }, [tables]);
+
   useEffect(() => {
     if (activeFk && !fkInfo[activeFk]) setActiveFk(null);
   }, [activeFk, fkInfo]);
@@ -426,19 +440,33 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
   const svgLines = useMemo(() => {
     const lines = []; const rects = {};
     for (const t of tables) { const pos = positions[t.id]; const dim = tableDims[t.id]; if (pos && dim) rects[t.id] = { x: pos.x, y: pos.y, w: dim.w, h: dim.h }; }
+    const tableByName = {}; for (const t of tables) tableByName[t.name] = t;
+    const colIdx = {}; for (const t of tables) { const m = {}; t.columns.forEach((c, i) => { m[c.name] = i; }); colIdx[t.id] = m; }
+    const tableSet = new Set(tables.map(t => t.id));
     for (const t of tables) {
       for (const ref of (t.refs || [])) {
         const lineKey = `${t.id}-${ref.column}-${ref.refTable}`;
-        const srcRect = rects[t.id]; const tgtTable = tables.find(t2 => t2.name === ref.refTable); const tgtRect = tgtTable ? rects[tgtTable.id] : null;
+        const srcRect = rects[t.id]; const tgtTable = tableByName[ref.refTable]; const tgtRect = tgtTable ? rects[tgtTable.id] : null;
         if (!srcRect || !tgtRect) continue;
-        const srcColIdx = t.columns.findIndex(c => c.name === ref.column);
-        const tgtColIdx = tgtTable.columns.findIndex(c => c.name === ref.refColumn);
-        const obstacles = tables.filter(t2 => t2.id !== t.id && t2.id !== tgtTable.id).map(t2 => rects[t2.id]).filter(Boolean);
+        const srcColIdx = colIdx[t.id][ref.column];
+        const tgtColIdx = colIdx[tgtTable.id][ref.refColumn];
         let points;
         if (linePaths && linePaths[lineKey]) {
           points = linePaths[lineKey];
         } else {
-          points = findRoute(srcRect, srcColIdx, tgtRect, tgtColIdx, obstacles);
+          const cacheKey = `${lineKey}_${srcRect.x},${srcRect.y},${srcRect.w},${srcRect.h}_${tgtRect.x},${tgtRect.y},${tgtRect.w},${tgtRect.h}`;
+          const cached = routeCacheRef.current[cacheKey];
+          if (cached) {
+            points = cached;
+          } else {
+            const obstacles = [];
+            for (const id of tableSet) {
+              if (id !== t.id && id !== tgtTable.id) { const r = rects[id]; if (r) obstacles.push(r); }
+            }
+            points = findRoute(srcRect, srcColIdx >= 0 ? srcColIdx : 0, tgtRect, tgtColIdx >= 0 ? tgtColIdx : 0, obstacles);
+            routeCacheRef.current[cacheKey] = points;
+            if (Object.keys(routeCacheRef.current) > 200) routeCacheRef.current = {};
+          }
         }
         if (points) {
           const card = ref.cardinality || 'M:1';
@@ -746,12 +774,10 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
     for (const t of tables) {
       const p = positions[t.id];
       if (!p) continue;
-      const nCols = t.columns.length;
-      const h = 40 + nCols * 34 + 44;
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
       maxX = Math.max(maxX, p.x + 310);
-      maxY = Math.max(maxY, p.y + h);
+      maxY = Math.max(maxY, p.y + tableHeight(t));
     }
     for (const layer of layers) {
       if (layer.visible === false) continue;
@@ -946,13 +972,13 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
                 <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-[#c9d1d9] mb-2">Database Modeler</h2>
+            <h2 className="text-xl font-bold text-[#c9d1d9] mb-2">Diagram Generator</h2>
             <p className="text-sm text-[#8b949e] max-w-xs mx-auto leading-relaxed">Diseña y modela tus bases de datos visualmente.<br/>Escribe SQL en el panel izquierdo para comenzar.</p>
           </div>
         </div>
       )}
       {activeFk && fkInfo[activeFk] && (() => {
-        const key = activeFk; const info = fkInfo[key]; const srcTable = tables.find(t => t.id === info.tableId); const tgtTable = tables.find(t => t.name === info.refTable);
+        const key = activeFk; const info = fkInfo[key]; const srcTable = tableByIdRef.current[info.tableId]; const tgtTable = tableByNameRef.current[info.refTable];
         return (
           <div className="absolute top-4 left-4 bg-[#21262d]/90  border border-white/20 rounded-xl p-3 shadow-lg z-20 ">
             <div className="flex items-center gap-3 mb-2">
@@ -1792,7 +1818,7 @@ CREATE TABLE pedido_productos (
               <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
             </svg>
           </div>
-          <h1 className="text-lg font-bold text-[#c9d1d9]">Database Modeler</h1>
+          <h1 className="text-lg font-bold text-[#c9d1d9]">Diagram Generator</h1>
         </div>
         <div className="flex items-center gap-1.5">
           <input ref={fileInputRef} type="file" accept=".sql" onChange={handleImportFile} className="hidden" />

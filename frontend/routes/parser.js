@@ -47,28 +47,19 @@ function parseColumnDef(def) {
 function parseCardinalityHints(sql) {
   const hints = {};
   const tablesInOrder = [];
-  const tableRe = /(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([\w\u00C0-\u00FF]+)[`"']?)[\s(]/gi;
-  let tm;
-  while ((tm = tableRe.exec(sql)) !== null) {
-    tablesInOrder.push({ name: tm[1].toLowerCase(), index: tm.index });
-  }
-  const patterns = [
-    /FOREIGN\s+KEY\s*\([`"']?(\w+)[`"']?\)\s+REFERENCES\s+[`"']?(\w+)[`"']?\s*\([^)]+\)\s*--\s*(1:1|1:M|M:1|M:M)/gmi,
-    /(?:^|,)\s*[`"']?(\w+)[`"']?\s+\w+(?:\([^)]*\))?\s+(?:UNIQUE\s+)?REFERENCES\s+[`"']?(\w+)[`"']?\s*\([^)]+\)\s*--\s*(1:1|1:M|M:1|M:M)/gmi
-  ];
-  for (const re of patterns) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(sql)) !== null) {
-      const col = (m[1] || '').toLowerCase();
-      if (!col) continue;
-      const refTable = (m[2] || '').toLowerCase();
-      const cardinality = m[3];
-      let srcTable = '';
+  const combinedRe = /(?:CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"']?([\w\u00C0-\u00FF]+)[`"']?)[\s(]|(?:FOREIGN\s+KEY\s*\([`"']?(\w+)[`"']?\)\s+REFERENCES\s+[`"']?(\w+)[`"']?\s*\([^)]+\)\s*--\s*(1:1|1:M|M:1|M:M))|(?:^|[,(])\s*[`"']?(\w+)[`"']?\s+\w+(?:\([^)]*\))?\s+(?:UNIQUE\s+)?REFERENCES\s+[`"']?(\w+)[`"']?\s*\([^)]+\)\s*--\s*(1:1|1:M|M:1|M:M)/gi;
+  let m;
+  while ((m = combinedRe.exec(sql)) !== null) {
+    if (m[1]) {
+      tablesInOrder.push({ name: m[1].toLowerCase(), index: m.index });
+    } else {
+      const col = (m[2] || m[5] || '').toLowerCase();
+      const refTable = (m[3] || m[6] || '').toLowerCase();
+      const cardinality = m[4] || m[7];
+      if (!col || !cardinality) continue;
       for (let i = tablesInOrder.length - 1; i >= 0; i--) {
-        if (tablesInOrder[i].index < m.index) { srcTable = tablesInOrder[i].name; break; }
+        if (tablesInOrder[i].index < m.index) { hints[`${tablesInOrder[i].name}.${col}.${refTable}`] = cardinality; break; }
       }
-      if (srcTable) hints[`${srcTable}.${col}.${refTable}`] = cardinality;
     }
   }
   return hints;
@@ -89,15 +80,16 @@ function parseSQL(sql) {
     if (cm) {
       const t = { id: uid(), name: cm[1], columns: [], refs: [], color: TABLE_COLORS[tableIdx++ % TABLE_COLORS.length] };
       const parts = splitTopLevel(cm[2]);
+      const colByName = {};
       for (const part of parts) {
         const p = part.trim();
         const pk = p.match(/PRIMARY\s+KEY\s*\(([^)]+)\)/i);
-        if (pk) { pk[1].split(',').map(c => c.trim().replace(/[`"']/g, '')).forEach(cn => { const c = t.columns.find(col => col.name === cn); if (c) c.pk = true; }); continue; }
+        if (pk) { pk[1].split(',').forEach(cn => { const clean = cn.trim().replace(/[`"']/g, ''); const c = colByName[clean]; if (c) c.pk = true; }); continue; }
         const fk = p.match(/FOREIGN\s+KEY\s*\([`"']?([\w\u00C0-\u00FF]+)[`"']?\)\s*REFERENCES\s+[`"']?(\w+)[`"']?\s*\([`"']?([\w\u00C0-\u00FF]+)[`"']?\)/i);
-        if (fk) { const fkCol = fk[1].replace(/[`"']/g, '').trim(); const fkTbl = fk[2]; const fkColObj = t.columns.find(c => c.name === fkCol); const cardHint = cardHints[`${t.name.toLowerCase()}.${fkCol.toLowerCase()}.${fkTbl.toLowerCase()}`]; const defCard = (fkColObj && (fkColObj.uq || fkColObj.pk)) ? '1:1' : 'M:1'; t.refs.push({ column: fkCol, refTable: fkTbl, refColumn: fk[3].replace(/[`"']/g, '').trim(), cardinality: cardHint || defCard }); if (fkColObj) fkColObj.fk = true; continue; }
+        if (fk) { const fkCol = fk[1].replace(/[`"']/g, '').trim(); const fkTbl = fk[2]; const fkColObj = colByName[fkCol]; const cardHint = cardHints[`${t.name.toLowerCase()}.${fkCol.toLowerCase()}.${fkTbl.toLowerCase()}`]; const defCard = (fkColObj && (fkColObj.uq || fkColObj.pk)) ? '1:1' : 'M:1'; t.refs.push({ column: fkCol, refTable: fkTbl, refColumn: fk[3].replace(/[`"']/g, '').trim(), cardinality: cardHint || defCard }); if (fkColObj) fkColObj.fk = true; continue; }
         if (/^(INDEX|KEY|UNIQUE|CONSTRAINT|CHECK|FULLTEXT|SPATIAL)\b/i.test(p)) continue;
         const col = parseColumnDef(p);
-        if (col) { if (col.fk && col.refTable) { const cardHint2 = cardHints[`${t.name.toLowerCase()}.${col.name.toLowerCase()}.${col.refTable.toLowerCase()}`]; const defCard = (col.uq || col.pk) ? '1:1' : 'M:1'; t.refs.push({ column: col.name, refTable: col.refTable, refColumn: col.refColumn, cardinality: cardHint2 || defCard }); } t.columns.push(col); }
+        if (col) { if (col.fk && col.refTable) { const cardHint2 = cardHints[`${t.name.toLowerCase()}.${col.name.toLowerCase()}.${col.refTable.toLowerCase()}`]; const defCard = (col.uq || col.pk) ? '1:1' : 'M:1'; t.refs.push({ column: col.name, refTable: col.refTable, refColumn: col.refColumn, cardinality: cardHint2 || defCard }); } t.columns.push(col); colByName[col.name] = col; }
       }
       tables.push(t);
       continue;
@@ -108,8 +100,9 @@ function parseSQL(sql) {
       const table = tables.find(t => t.name === tn);
       if (table) {
         if (!table.refs) table.refs = [];
-        if (!table.refs.some(r => r.column === cn && r.refTable === rt)) { const cardHint3 = cardHints[`${table.name.toLowerCase()}.${cn.toLowerCase()}.${rt.toLowerCase()}`]; const colObj3 = table.columns.find(c => c.name === cn); table.refs.push({ column: cn, refTable: rt, refColumn: rc, cardinality: cardHint3 || (colObj3 && (colObj3.uq || colObj3.pk) ? '1:1' : 'M:1') }); }
-        const col = table.columns.find(c => c.name === cn);
+        const colByName = {}; for (const c of table.columns) colByName[c.name] = c;
+        if (!table.refs.some(r => r.column === cn && r.refTable === rt)) { const cardHint3 = cardHints[`${table.name.toLowerCase()}.${cn.toLowerCase()}.${rt.toLowerCase()}`]; const colObj3 = colByName[cn]; table.refs.push({ column: cn, refTable: rt, refColumn: rc, cardinality: cardHint3 || (colObj3 && (colObj3.uq || colObj3.pk) ? '1:1' : 'M:1') }); }
+        const col = colByName[cn];
         if (col) col.fk = true;
       }
     }
