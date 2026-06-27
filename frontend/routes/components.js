@@ -305,6 +305,10 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
   }, [tables]);
 
   useEffect(() => {
+    if (activeFk && !fkInfo[activeFk]) setActiveFk(null);
+  }, [activeFk, fkInfo]);
+
+  useEffect(() => {
     const dims = {};
     for (const t of tables) { const el = tableRefs.current[t.id]; if (el) { const r = el.getBoundingClientRect(); dims[t.id] = { w: r.width / zoom, h: r.height / zoom }; } }
     setTableDims(dims);
@@ -650,10 +654,14 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
       <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
          <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible', zIndex: 0 }}>
           <defs>
-            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
             <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
-            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker-end" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="one-marker-end-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
             <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker-end" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="many-marker-end-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
             <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
             <filter id="layer-glow"><feGaussianBlur stdDeviation="12" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
@@ -684,7 +692,7 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             return (
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseFk(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseFk(null), 2400); }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.8} strokeLinecap="butt" strokeLinejoin="miter" opacity={highlight ? 0.9 : 0.35} fill="none" markerStart={`url(#${l.startMarker}-marker${smHl})`} markerEnd={`url(#${l.endMarker}-marker-end${smHl})`} filter={highlight ? 'url(#glow)' : 'none'} style={{ pointerEvents: 'none' }} />
                 <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 3.5 : 2.5} strokeDasharray="0, 8" strokeLinecap="round" opacity={highlight ? 1 : 0.4} fill="none" style={{ pointerEvents: 'none' }} />
 
                 {(isActive || isHovered) && l.points.map((p, pi) => {
@@ -748,8 +756,6 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
       )}
       {(activeFk || hoveredFk) && fkInfo[activeFk || hoveredFk] && (() => {
         const key = activeFk || hoveredFk; const info = fkInfo[key]; const srcTable = tables.find(t => t.id === info.tableId); const tgtTable = tables.find(t => t.name === info.refTable);
-        const cardOptions = ['M:1', '1:1', '1:M', 'M:M'];
-        const cardLabels = { 'M:1': 'Muchos a Uno', '1:1': 'Uno a Uno', '1:M': 'Uno a Muchos', 'M:M': 'Muchos a Muchos' };
         return (
           <div className="absolute top-4 left-4 bg-[#21262d]/90  border border-white/20 rounded-xl p-3 shadow-lg z-20">
             <div className="flex items-center gap-3 mb-2">
@@ -761,11 +767,18 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
             {activeFk && onUpdateRef && (
               <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2">
                 <span className="text-[11px] text-[#6e7681] shrink-0">Cardinalidad:</span>
-                {cardOptions.map(c => (
-                  <button key={c} onClick={e => { e.stopPropagation(); onUpdateRef(info.tableId, info.column, info.refTable, c); }}
-                    className={`text-[10px] font-mono font-bold px-2 py-1 rounded border ${info.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681] '}`}
-                    title={cardLabels[c]}>{c}</button>
-                ))}
+                {['1:1', info.cardinality === 'M:1' || info.cardinality === '1:M' ? info.cardinality : '1:M', 'M:M'].map(c => {
+                  const isToggle = c === 'M:1' || c === '1:M';
+                  const next = isToggle ? (info.cardinality === '1:M' ? 'M:1' : '1:M') : c;
+                  const isActive = info.cardinality === c;
+                  return (
+                    <button key={c} onClick={e => { e.stopPropagation(); onUpdateRef(info.tableId, info.column, info.refTable, next); }}
+                      className={`text-[10px] font-mono font-bold px-2 py-1 rounded border flex items-center gap-1 ${isActive ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681]'}`}>
+                      {isToggle && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>}
+                      {c}
+                    </button>
+                  );
+                })}
               </div>
             )}
             {activeFk && linePaths[key] && (

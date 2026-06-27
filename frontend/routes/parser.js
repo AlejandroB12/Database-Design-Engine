@@ -17,6 +17,9 @@ function parseColumnDef(def) {
   const m = def.trim().match(/^[`"']?([\w\u00C0-\u00FF]+)[`"']?\s+(\w+)(\([^)]*\))?\s*(.*)/i);
   if (!m) return null;
   let name = m[1], type = m[2].toUpperCase(), params = m[3] || '', rest = m[4];
+  if ((type === 'AUTO_INCREMENT' || type === 'AUTOINCREMENT') && !params) {
+    rest = 'AUTO_INCREMENT ' + rest; type = 'INT';
+  }
   let col = { id: uid(), name, type, length: null, values: '', pk: false, nn: false, uq: false, ai: false, fk: false, refTable: '', refColumn: '', defaultValue: '' };
   if (type === 'SERIAL' || type === 'BIGSERIAL' || type === 'SMALLSERIAL') {
     const typeMap = { SERIAL: 'INT', BIGSERIAL: 'BIGINT', SMALLSERIAL: 'SMALLINT' };

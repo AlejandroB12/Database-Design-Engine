@@ -18,7 +18,6 @@ function generateMySQL(tables, categories, tableCategory) {
       }
     }
     const cols = [];
-    const pks = t.columns.filter(c => c.pk).map(c => sanitize(c.name));
     for (const c of t.columns) {
       if (!c.name) continue;
       let def = `  ${quoteIdMySQL(sanitize(c.name))} ${c.type}`;
@@ -28,12 +27,12 @@ function generateMySQL(tables, categories, tableCategory) {
       else if (['FLOAT','DOUBLE','DECIMAL'].includes(c.type) && c.length) def += `(${c.length})`;
       else if (c.length && !['ENUM','TEXT','BLOB','DATE','DATETIME','TIMESTAMP','BOOLEAN','UUID','JSON'].includes(c.type)) def += `(${c.length})`;
       if (c.ai) def += ' AUTO_INCREMENT';
+      if (c.pk) def += ' PRIMARY KEY';
       if (c.nn) def += ' NOT NULL';
       if (c.uq) def += ' UNIQUE';
       if (c.defaultValue) def += ` DEFAULT '${c.defaultValue}'`;
       cols.push(def);
     }
-    if (pks.length > 0) cols.push(`  PRIMARY KEY (${pks.map(p => quoteIdMySQL(p)).join(', ')})`);
     for (const r of (t.refs || [])) {
       if (t.columns.some(c => c.name === r.column)) {
         let fkLine = `  FOREIGN KEY (${quoteIdMySQL(sanitize(r.column))}) REFERENCES ${quoteIdMySQL(sanitize(r.refTable))}(${quoteIdMySQL(sanitize(r.refColumn))})`;
@@ -54,12 +53,12 @@ function generatePostgreSQL(tables) {
     if (!t.name || t.columns.length === 0) continue;
     const tn = sanitize(t.name);
     const cols = [];
-    const pks = t.columns.filter(c => c.pk).map(c => sanitize(c.name));
     for (const c of t.columns) {
       if (!c.name) continue;
       const qt = quoteId(sanitize(c.name));
       let def = `  ${qt} ${pgType(c)}`;
       if (c.ai) def += ' GENERATED ALWAYS AS IDENTITY';
+      if (c.pk) def += ' PRIMARY KEY';
       if (c.nn) def += ' NOT NULL';
       if (c.uq) def += ' UNIQUE';
       if (c.defaultValue) {
@@ -68,7 +67,6 @@ function generatePostgreSQL(tables) {
       }
       cols.push(def);
     }
-    if (pks.length > 0) cols.push(`  PRIMARY KEY (${pks.map(p => quoteId(p)).join(', ')})`);
     for (const r of (t.refs || [])) {
       if (t.columns.some(c => c.name === r.column)) {
         let fkLine = `  FOREIGN KEY (${quoteId(sanitize(r.column))}) REFERENCES ${quoteId(sanitize(r.refTable))}(${quoteId(sanitize(r.refColumn))})`;

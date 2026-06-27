@@ -608,6 +608,8 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
             <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
             <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
             <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker-end" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="many-marker-end-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
             <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
           {entities.length > 0 && <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="transparent" stroke="rgba(139,148,158,0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />}
@@ -621,7 +623,7 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
                   onMouseDown={e => { if (isActive) handleLineMouseDown(e, l.key, l.points); else setActiveRel(l.key); }}
                   onMouseEnter={() => setHoveredRel(l.key)} onMouseLeave={() => setHoveredRel(h => h === l.key ? null : h)} />
                 <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={hl ? 0.65 : 0.3} fill="none"
-                  markerStart={`url(#${l.startMarker}-marker${hl ? '-hl' : ''})`} markerEnd={`url(#${l.endMarker}-marker${hl ? '-hl' : ''})`}
+                  markerStart={`url(#${l.startMarker}-marker${hl ? '-hl' : ''})`} markerEnd={`url(#${l.endMarker}-marker-end${hl ? '-hl' : ''})`}
                   style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
                 <path d={pathStr} stroke="#ffffff" strokeWidth={4} fill="none" filter="url(#glow)" opacity={hl ? 0.3 : 0}
                   style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
