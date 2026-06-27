@@ -951,8 +951,8 @@ function Diagram({ tables, selectedTables, onSelectTable, onAddColumn, onDeleteT
           </div>
         </div>
       )}
-      {(activeFk || hoveredFk) && fkInfo[activeFk || hoveredFk] && (() => {
-        const key = activeFk || hoveredFk; const info = fkInfo[key]; const srcTable = tables.find(t => t.id === info.tableId); const tgtTable = tables.find(t => t.name === info.refTable);
+      {activeFk && fkInfo[activeFk] && (() => {
+        const key = activeFk; const info = fkInfo[key]; const srcTable = tables.find(t => t.id === info.tableId); const tgtTable = tables.find(t => t.name === info.refTable);
         return (
           <div className="absolute top-4 left-4 bg-[#21262d]/90  border border-white/20 rounded-xl p-3 shadow-lg z-20 ">
             <div className="flex items-center gap-3 mb-2">
@@ -1355,8 +1355,6 @@ function SortPanel({ tables, categories, tableCategory, onSort, onClose }) {
 }
   </script>
   <script type="text/babel">
-const { useState, useCallback, useMemo, useRef, useEffect } = React;
-
 function App() {
   const [sql, setSql] = useState('');
   const [tables, setTables] = useState([]);

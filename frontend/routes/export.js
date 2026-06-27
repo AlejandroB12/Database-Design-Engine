@@ -120,8 +120,9 @@ function rgbToHex(rgb) {
   return '#' + [m[1], m[2], m[3]].map(x => parseInt(x).toString(16).padStart(2, '0')).join('');
 }
 
-function drawCard(ctx, data) {
-  const { left, top, w, h, tableName, colCount, tableColor, columns } = data;
+function drawCard(ctx, data, tableColorOverride) {
+  const { left, top, w, h, tableName, colCount, tableColor: origColor, columns } = data;
+  const tableColor = tableColorOverride || origColor;
   const x = left, y = top;
   const r = 8;
 
@@ -141,25 +142,11 @@ function drawCard(ctx, data) {
   ctx.fill();
   ctx.restore();
 
-  // Border
-  ctx.save();
-  ctx.strokeStyle = 'rgba(48,54,61,0.6)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, x, y, w, h, r);
-  ctx.stroke();
-  ctx.restore();
-
   // Left accent border
   ctx.save();
   ctx.fillStyle = tableColor + '80';
   roundRect(ctx, x + 1, y + 12, 3, h - 24, 1.5);
   ctx.fill();
-  ctx.restore();
-
-  // Bottom accent line
-  ctx.save();
-  ctx.fillStyle = tableColor + '30';
-  ctx.fillRect(x + 1, y + h - 2, w - 2, 2);
   ctx.restore();
 
   // Header gradient
@@ -171,16 +158,6 @@ function drawCard(ctx, data) {
   ctx.fillStyle = hdrGrad;
   roundRect(ctx, x, y, w, hdrH, { tl: r, tr: r, bl: 0, br: 0 });
   ctx.fill();
-  ctx.restore();
-
-  // Header bottom line
-  ctx.save();
-  ctx.strokeStyle = tableColor + '35';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x, y + hdrH);
-  ctx.lineTo(x + w, y + hdrH);
-  ctx.stroke();
   ctx.restore();
 
   // Color indicator dot
@@ -224,31 +201,6 @@ function drawCard(ctx, data) {
     ctx.fillRect(x + 1, cy, w - 2, 34);
     ctx.restore();
 
-    // Bottom border (not on last)
-    if (!isLast) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(33,38,45,0.4)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, cy + 34);
-      ctx.lineTo(x + w, cy + 34);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    // Left accent
-    if (col.hasAccent && col.accentColor) {
-      ctx.save();
-      ctx.fillStyle = col.accentColor + '60';
-      ctx.fillRect(x + 1, cy + 1, 2, 32);
-      ctx.restore();
-    } else {
-      ctx.save();
-      ctx.fillStyle = 'transparent';
-      ctx.fillRect(x + 1, cy + 1, 2, 32);
-      ctx.restore();
-    }
-
     // Type badge
     const badgeX = x + 16;
     const badgeText = col.type;
@@ -276,10 +228,9 @@ function drawCard(ctx, data) {
     if (col.isPk) cParts.push({ label: 'PK', color: '#d29922' });
     if (col.isFk && !col.isPk) cParts.push({ label: 'FK', color: '#a371f7' });
     if (col.isUq && !col.isPk) cParts.push({ label: 'UQ', color: '#58a6ff' });
+    if (col.isNn) cParts.push({ label: 'NN', color: '#f85149' });
+    if (col.isAi) cParts.push({ label: 'AI', color: '#3fb950' });
     for (const cp of cParts) constraintW += ctx.measureText(cp.label).width + 16;
-    ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
-    if (col.isNn) constraintW += ctx.measureText('NN').width + 24;
-    if (col.isAi) constraintW += ctx.measureText('AI').width + 24;
 
     // Column name
     const nameX2 = badgeX + badgeW + 10;
@@ -315,41 +266,7 @@ function drawCard(ctx, data) {
       cx2 = cbx - 4;
     }
 
-    if (col.isNn) {
-      ctx.save();
-      ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
-      const tw = ctx.measureText('NN').width;
-      const totalW = tw + 20;
-      const cbx = cx2 - totalW;
-      ctx.fillStyle = '#f85149';
-      ctx.beginPath();
-      ctx.arc(cbx + 6, cy + 17, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#f85149';
-      ctx.fillText('NN', cbx + 12, cy + 17);
-      cx2 = cbx - 4;
-      ctx.restore();
-    }
 
-    if (col.isAi) {
-      ctx.save();
-      ctx.font = '600 9px "Segoe UI", system-ui, sans-serif';
-      const tw = ctx.measureText('AI').width;
-      const totalW = tw + 20;
-      const cbx = cx2 - totalW;
-      ctx.fillStyle = '#3fb950';
-      ctx.beginPath();
-      ctx.arc(cbx + 6, cy + 17, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#3fb950';
-      ctx.fillText('AI', cbx + 12, cy + 17);
-      cx2 = cbx - 4;
-      ctx.restore();
-    }
   }
 }
 
@@ -378,7 +295,8 @@ function truncateText(text, ctx, maxWidth) {
   return truncated + '...';
 }
 
-async function captureDiagram() {
+async function captureDiagram(options = {}) {
+  const tableColor = options.tableColor || null;
   console.log('[Export] Usando Canvas 2D nativo (sin html2canvas)');
   const diagramCanvas = document.querySelector('.diagram-canvas');
   if (!diagramCanvas) return Promise.reject('No se encontro el diagrama');
@@ -396,21 +314,9 @@ async function captureDiagram() {
   const ctx = outCanvas.getContext('2d');
   ctx.scale(EXPORT_SCALE, EXPORT_SCALE);
 
-  // Background color
-  ctx.fillStyle = '#0d1117';
+  // Background
+  ctx.fillStyle = '#21262d';
   ctx.fillRect(0, 0, bounds.w, bounds.h);
-
-  // Background image
-  const bgImg = new Image();
-  await new Promise(resolve => { bgImg.onload = resolve; bgImg.onerror = resolve; bgImg.src = '/images/fondo.jpg'; });
-  if (bgImg.complete && bgImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.globalAlpha = 1;
-    ctx.drawImage(bgImg, 0, 0, bounds.w, bounds.h);
-    ctx.fillStyle = 'rgba(13,17,23,0.5)';
-    ctx.fillRect(0, 0, bounds.w, bounds.h);
-    ctx.restore();
-  }
 
   // SVG connections
   if (svgEl) {
@@ -422,6 +328,8 @@ async function captureDiagram() {
       if (op < 0.4) el.setAttribute('opacity', '0.7');
     });
     clone.querySelectorAll('image').forEach(el => el.remove());
+    clone.querySelectorAll('rect[stroke-dasharray]').forEach(el => el.remove());
+    clone.querySelectorAll('g[opacity][fill="none"]').forEach(el => el.remove());
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('width', bounds.w);
     clone.setAttribute('height', bounds.h);
@@ -448,7 +356,7 @@ async function captureDiagram() {
   // Draw cards
   for (const data of cardsData) {
     await yieldToBrowser();
-    drawCard(ctx, data);
+    drawCard(ctx, data, tableColor);
   }
 
   return outCanvas;
@@ -461,25 +369,24 @@ function showPreview(canvas, format) {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.8)';
 
     const maxW = window.innerWidth * 0.85;
-    const maxH = window.innerHeight * 0.8;
+    const maxH = window.innerHeight * 0.75;
     let imgW = canvas.width / EXPORT_SCALE;
     let imgH = canvas.height / EXPORT_SCALE;
     if (imgW > maxW) { imgH = imgH * maxW / imgW; imgW = maxW; }
     if (imgH > maxH) { imgW = imgW * maxH / imgH; imgH = maxH; }
 
     let zoom = 1;
-    const minZoom = 0.25;
+    const minZoom = 1;
     const maxZoom = 4;
 
     function btnStyle(bg, text, border) {
       return `padding:6px 14px;border:${border || 'none'};border-radius:6px;background:${bg};color:${text};font-size:13px;font-weight:600;cursor:pointer;font-family:sans-serif;display:flex;align-items:center;gap:4px`;
     }
-
     const box = document.createElement('div');
-    box.style.cssText = 'background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;max-width:90vw;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.6)';
+    box.style.cssText = 'background:transparent;border:1px solid #30363d;border-radius:12px;padding:20px;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 24px 80px rgba(0,0,0,0.6)';
 
     const title = document.createElement('div');
-    title.style.cssText = 'color:#c9d1d9;font-size:14px;font-family:sans-serif;font-weight:600;margin-bottom:12px;text-align:center';
+    title.style.cssText = 'color:#c9d1d9;font-size:14px;font-family:sans-serif;font-weight:600;margin-bottom:10px;text-align:center';
     title.textContent = 'Vista previa - ' + format.toUpperCase();
 
     const imgWrap = document.createElement('div');
@@ -533,7 +440,7 @@ function showPreview(canvas, format) {
     imgWrap.appendChild(img);
 
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;margin-top:12px;align-items:center';
+    btnRow.style.cssText = 'display:flex;gap:8px;justify-content:center;margin-top:10px;align-items:center;flex-wrap:wrap';
 
     function updateZoom() {
       img.style.transform = `scale(${zoom})`;
@@ -581,9 +488,12 @@ function showPreview(canvas, format) {
     overlay.appendChild(box);
     document.body.appendChild(overlay);
 
-    dlBtn.onclick = () => { document.body.removeChild(overlay); resolve('download'); };
-    cancelBtn.onclick = () => { document.body.removeChild(overlay); resolve('cancel'); };
-    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve('cancel'); } };
+    dlBtn.onclick = () => {
+      document.body.removeChild(overlay);
+      resolve(canvas);
+    };
+    cancelBtn.onclick = () => { document.body.removeChild(overlay); resolve(null); };
+    overlay.onclick = (e) => { if (e.target === overlay) { document.body.removeChild(overlay); resolve(null); } };
   });
 }
 
@@ -596,9 +506,9 @@ async function exportPNG(filename) {
   await yieldToBrowser();
   captureDiagram().then(async canvas => {
     hideLoadingOverlay();
-    const action = await showPreview(canvas, 'png');
-    if (action === 'download') {
-      canvas.toBlob(blob => {
+    const resultCanvas = await showPreview(canvas, 'png');
+    if (resultCanvas) {
+      resultCanvas.toBlob(blob => {
         downloadBlob(blob, filename || 'diagrama.png');
         restoreExportBtn(btn, 'png');
         exportPending = false;
@@ -619,12 +529,12 @@ async function exportPDF(filename) {
   await yieldToBrowser();
   captureDiagram().then(async canvas => {
     hideLoadingOverlay();
-    const action = await showPreview(canvas, 'pdf');
-    if (action === 'download') {
-      const imgData = canvas.toDataURL('image/png');
+    const resultCanvas = await showPreview(canvas, 'pdf');
+    if (resultCanvas) {
+      const imgData = resultCanvas.toDataURL('image/png');
       const { PDFDocument } = PDFLib;
-      const w = canvas.width / EXPORT_SCALE;
-      const h = canvas.height / EXPORT_SCALE;
+      const w = resultCanvas.width / EXPORT_SCALE;
+      const h = resultCanvas.height / EXPORT_SCALE;
       const pdfDoc = await PDFDocument.create();
       const pngImageBytes = await fetch(imgData).then(r => r.arrayBuffer());
       const pngImage = await pdfDoc.embedPng(pngImageBytes);
