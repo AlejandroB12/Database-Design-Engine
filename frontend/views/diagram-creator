@@ -8,6 +8,9 @@
   <script src="/lib/react.production.min.js"></script>
   <script src="/lib/react-dom.production.min.js"></script>
   <script src="/lib/babel.min.js"></script>
+  <script src="/routes/utils.js"></script>
+  <script src="/routes/layout.js"></script>
+  <script src="/routes/export.js"></script>
   <style>
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0d1117; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -51,6 +54,12 @@
       75% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
     }
     .col-pulse { animation: col-pulse 1.2s ease-in-out 2; }
+    .sql-keyword { color: #ff7b72; font-weight: 600; }
+    .sql-string { color: #a5d6ff; }
+    .sql-number { color: #79c0ff; }
+    .sql-comment { color: #8b949e; font-style: italic; }
+    .sql-operator { color: #c9d1d9; }
+    .sql-backtick { color: #7ee787; }
   </style>
 </head>
 <body>
@@ -58,10 +67,7 @@
   <script type="text/babel">
 const { useState, useCallback, useMemo, useRef, useEffect } = React;
 
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const COLUMN_TYPES = ['INT','BIGINT','SMALLINT','TINYINT','VARCHAR','CHAR','TEXT','MEDIUMTEXT','LONGTEXT','BOOLEAN','DATE','DATETIME','TIMESTAMP','FLOAT','DOUBLE','DECIMAL','BLOB','ENUM','UUID','JSON'];
-const BTN_STYLES = { pk: 'bg-[#d29922]/20 border-[#d29922]/50 text-[#d29922]', ai: 'bg-[#238636]/20 border-[#238636]/50 text-[#3fb950]', nn: 'bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]', uq: 'bg-[#58a6ff]/20 border-[#58a6ff]/50 text-[#58a6ff]' };
-const TCOLOR = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+
 
 function midpoint(p1, p2) { return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; }
 
@@ -168,23 +174,37 @@ function pointsToAngularPath(points) {
   return d;
 }
 
-function ColumnBadge({ col, tableId, tableName, activeRel, hoveredRel, relInfo, pulseRel }) {
+function convertEntitiesToTables(entities, relations) {
+  return entities.map(e => ({
+    ...e,
+    refs: relations.filter(r => r.sourceId === e.id).map(r => {
+      const tgt = entities.find(en => en.id === r.targetId);
+      return { column: '', refTable: tgt ? tgt.name : '', refColumn: '', cardinality: r.cardinality || 'M:1' };
+    })
+  }));
+}
+
+function ColumnBadge({ col, entityId, entityName, activeRel, hoveredRel, relInfo, pulseRel }) {
   const typeColor = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
   const constraintMeta = col.pk ? { color: '#d29922', label: 'PK' } : col.uq ? { color: '#58a6ff', label: 'UQ' } : { color: null, label: '' };
   const accentColor = col.pk ? '#d29922' : col.fk ? '#a371f7' : col.uq ? '#58a6ff' : null;
-  const highlight = activeRel || hoveredRel;
+  const highlightKey = activeRel || hoveredRel;
+  const isHighlight = highlightKey && (
+    (relInfo[highlightKey]?.refEntityId === entityId && relInfo[highlightKey]?.refCol === col.name) ||
+    (relInfo[highlightKey]?.fkEntityId === entityId && relInfo[highlightKey]?.fkCol === col.name)
+  );
   const tc = typeColor[col.type] || '#8b949e';
   return (
-    <div className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${highlight ? 'bg-[#1f6feb]/12' : 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
+    <div data-col-badge="true"       className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${isHighlight ? 'bg-[#1f6feb]/12' : 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
       style={{ height: 34, borderLeft: '2px solid transparent' }}>
       <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
         style={{
-          color: highlight ? '#ffffff' : tc,
-          background: highlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
-          border: `1px solid ${highlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
-          boxShadow: highlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
+          color: isHighlight ? '#ffffff' : tc,
+          background: isHighlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
+          border: `1px solid ${isHighlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
+          boxShadow: isHighlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
         }}>{col.type}</span>
-      <span className={`text-[13px] font-medium flex-1 truncate ${highlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name || <span className="text-[#6e7681] italic">sin nombre</span>}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name || <span className="text-[#6e7681] italic">sin nombre</span>}</span>
       <div className="flex items-center gap-1 shrink-0">
         {constraintMeta.label && (
           <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
@@ -223,8 +243,9 @@ function ColumnBadge({ col, tableId, tableName, activeRel, hoveredRel, relInfo, 
   );
 }
 
-const EntityCard = React.forwardRef(({ entity, position, selected, onSelect, onDragStart, onDelete, onAddColumn, activeRel, hoveredRel, relInfo, pulseRel, relationMode, isRelSrc, isRelTgt }, ref) => {
+const EntityCard = React.forwardRef(({ entity, position, selected, onSelect, onDragStart, onDelete, onAddColumn, activeRel, hoveredRel, relInfo, pulseRel, relationMode, isRelSrc, isRelTgt, categories }, ref) => {
   const c = entity.color || '#6366f1';
+  const catColor = categories && categories.length > 0 ? categories[0].color : null;
   return (
     <div ref={ref} className={`table-card absolute rounded-lg overflow-hidden w-[310px] ${isRelSrc ? 'relation-source' : isRelTgt ? 'relation-target' : ''}`}
       onClick={relationMode ? (e) => { e.stopPropagation(); onSelect(entity.id); } : undefined}
@@ -233,16 +254,28 @@ const EntityCard = React.forwardRef(({ entity, position, selected, onSelect, onD
         background: 'linear-gradient(180deg, rgba(22,27,34,0.88) 0%, rgba(13,17,23,0.94) 100%)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        border: '1px solid', borderColor: selected ? c + '99' : 'rgba(48,54,61,0.6)',
-        borderLeft: `3px solid ${c}${selected ? 'cc' : '80'}`,
-        boxShadow: selected ? `0 0 0 1px ${c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)` : '0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
-        borderBottom: `2px solid ${c}${selected ? '80' : '30'}`
+        border: '1px solid',
+        borderColor: selected ? (catColor || c) + '99' : (catColor || 'rgba(48,54,61,0.6)'),
+        borderLeftWidth: catColor ? '4px' : '3px',
+        borderLeftColor: catColor || c + (selected ? 'cc' : '80'),
+        boxShadow: selected ? `0 0 0 1px ${catColor || c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)` : '0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
+        borderBottom: `2px solid ${catColor || c}${selected ? '80' : '30'}`
       }}>
-      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none" style={{ background: `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${c}35` }}
+      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none"
+        style={{ background: catColor ? `linear-gradient(180deg, ${catColor}25, ${catColor}05)` : `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${catColor || c}35` }}
         onMouseDown={(e) => onDragStart(e, entity.id)}>
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-[10px] h-[10px] rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}50` }} />
           <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{entity.name || <span className="text-[#6e7681] italic">sin nombre</span>}</h3>
+          {categories && categories.length > 0 && (
+            <div className="flex gap-1 ml-1">
+              {categories.map((cat, i) => (
+                <span key={i} className="text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none text-white" style={{ backgroundColor: cat.color, textShadow: '0 1px 2px rgba(0,0,0,0.5)' }} title={cat.name}>
+                  {cat.name.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-[11px] text-[#6e7681] font-medium">{entity.columns.length} col.</span>
@@ -257,7 +290,7 @@ const EntityCard = React.forwardRef(({ entity, position, selected, onSelect, onD
         {entity.columns.length === 0 ? (
           <div className="px-3 py-4 text-center" style={{ background: 'rgba(13,17,23,0.3)' }}><p className="text-[12px] text-[#6e7681] italic">Sin columnas</p></div>
         ) : (
-          entity.columns.map(col => <ColumnBadge key={col.id} col={col} tableId={entity.id} tableName={entity.name} activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={pulseRel} />)
+          entity.columns.map(col => <ColumnBadge key={col.id} col={col} entityId={entity.id} entityName={entity.name} activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={pulseRel} />)
         )}
       </div>
       {selected && (
@@ -276,8 +309,8 @@ function ColumnEditor({ col, onUpdate, onDelete }) {
   const sync = useCallback((upd) => { const n = { ...local, ...upd }; setLocal(n); onUpdate(col.id, n); }, [col.id, local, onUpdate]);
   return (
     <div className="px-3 py-1.5 flex items-center gap-1.5 hover:bg-[#21262d]/30 border-b border-[#30363d]/20 last:border-b-0">
-      <input value={local.name} onChange={e => sync({ name: e.target.value })} placeholder="col" className="w-20 bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1.5 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681]" />
-      <select value={local.type} onChange={e => sync({ type: e.target.value })} className="w-[76px] bg-[#21262d] text-[11px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none">
+      <input value={local.name} onChange={e => sync({ name: e.target.value })} placeholder="col" className="w-28 bg-[#21262d] text-[12px] text-[#c9d1d9] rounded border border-[#30363d] px-2 py-1.5 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none placeholder:text-[#6e7681]" />
+      <select value={local.type} onChange={e => sync({ type: e.target.value })} className="w-[90px] bg-[#21262d] text-[12px] text-[#c9d1d9] rounded border border-[#30363d] px-1 py-1.5 focus:ring-1 focus:ring-[#58a6ff] focus:outline-none">
         {COLUMN_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
       </select>
       {['VARCHAR','CHAR'].includes(local.type) && (
@@ -319,10 +352,18 @@ function RelationConfig({ relation, entities, onUpdate, onDelete, onClose, lineP
       </div>
       <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2">
         <span className="text-[11px] text-[#6e7681] shrink-0">Cardinalidad:</span>
-        {['1:1', '1:M', 'M:1', 'M:M'].map(c => (
-          <button key={c} onClick={() => onUpdate(relation.id, { cardinality: c })}
-            className={`text-[10px] font-mono font-bold px-2 py-1 rounded border ${relation.cardinality === c ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681]'}`}>{c}</button>
-        ))}
+        {['1:1', relation.cardinality === 'M:1' || relation.cardinality === '1:M' ? relation.cardinality : '1:M', 'M:M'].map(c => {
+          const isToggle = c === 'M:1' || c === '1:M';
+          const next = isToggle ? (relation.cardinality === '1:M' ? 'M:1' : '1:M') : c;
+          const isActive = relation.cardinality === c;
+          return (
+            <button key={c} onClick={() => onUpdate(relation.id, { cardinality: next })}
+              className={`text-[10px] font-mono font-bold px-2 py-1 rounded border flex items-center gap-1 ${isActive ? 'bg-[#1f6feb]/20 border-[#58a6ff]/50 text-[#79c0ff]' : 'bg-[#30363d]/40 border-[#30363d]/50 text-[#6e7681]'}`}>
+              {isToggle && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>}
+              {c}
+            </button>
+          );
+        })}
       </div>
       {linePaths && linePaths[relation.id] && (
         <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2 mt-2">
@@ -339,7 +380,133 @@ function RelationConfig({ relation, entities, onUpdate, onDelete, onClose, lineP
   );
 }
 
-function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActiveRel, relationMode, relationSource, onRelationClick, onDragStart, onDeleteEntity, onAddColumn, linePaths, onUpdateLinePath, onResetLinePath, onSaveLinePathState, onUndoLinePath, onPositionsChange, onSetZoom, onSetPan, selectedId, onSetSelected }) {
+function LayerPanel({ layers, onAddLayer, onRemoveLayer, onUpdateLayer, onClose }) {
+  return (
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d]/50">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#a371f7]/10 rounded-lg p-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a371f7" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+          <div><h3 className="text-[13px] font-semibold text-[#e6edf3] leading-tight">Capas</h3><p className="text-[11px] text-[#6e7681]">{layers.length} capas</p></div>
+        </div>
+        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <button onClick={onAddLayer} className="w-full text-[11px] text-[#6e7681] bg-[#0d1117] rounded-md py-2 border border-dashed border-[#30363d] hover:border-[#a371f7]/30 hover:text-[#a371f7] flex items-center justify-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Capa</button>
+        {layers.length === 0 && <div className="flex flex-col items-center py-8 text-[#6e7681]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-50"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><p className="text-[12px]">No hay capas</p><p className="text-[11px] mt-0.5">Crea capas visuales para tu diagrama</p></div>}
+        {layers.map(layer => (
+          <div key={layer.id} className="rounded-md border border-[#30363d] bg-[#0d1117] overflow-hidden" style={{ borderLeftColor: layer.color, borderLeftWidth: '3px' }}>
+            <div className="flex items-center gap-2 px-3 py-2">
+              <button onClick={e => { e.stopPropagation(); onUpdateLayer(layer.id, { visible: !(layer.visible !== false) }); }} className={`p-1 rounded ${layer.visible !== false ? 'text-[#8b949e] hover:text-[#e6edf3]' : 'text-[#30363d] hover:text-[#6e7681]'}`} title={layer.visible !== false ? 'Ocultar capa' : 'Mostrar capa'}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{layer.visible !== false ? <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></> : <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>}</svg>
+              </button>
+              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: layer.color }} />
+              <input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} className="flex-1 bg-transparent text-[12px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white truncate" />
+              <button onClick={e => { e.stopPropagation(); onRemoveLayer(layer.id); }} className="text-[#6e7681] hover:text-[#f85149] p-1 rounded hover:bg-[#f85149]/10"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+            {layer.visible !== false && <div className="h-0.5" style={{ background: `linear-gradient(90deg, ${layer.color}33, transparent)` }} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CategoryPanel({ categories, entities, entityCategory, onAddCategory, onRemoveCategory, onUpdateCategory, onSetEntityCategory, onClose }) {
+  const getCategory = (eid) => entityCategory && entityCategory[eid];
+  return (
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d]/50">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#d29922]/10 rounded-lg p-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d29922" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+          <div><h3 className="text-[13px] font-semibold text-[#e6edf3] leading-tight">Categorías</h3><p className="text-[11px] text-[#6e7681]">{categories.length} categorías &middot; {entities.length} entidades</p></div>
+        </div>
+        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        <button onClick={onAddCategory} className="w-full text-[11px] text-[#6e7681] bg-[#0d1117] rounded-md py-2 border border-dashed border-[#30363d] hover:border-[#d29922]/30 hover:text-[#d29922] flex items-center justify-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="M12 5v14"/></svg>Nueva Categoría</button>
+        {categories.length === 0 && <div className="flex flex-col items-center py-8 text-[#6e7681]"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mb-2 opacity-50"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><p className="text-[12px]">No hay categorías</p><p className="text-[11px] mt-0.5">Crea una categoría y asigna entidades</p></div>}
+        {categories.map(cat => {
+          const assignedEntities = entities.filter(e => getCategory(e.id) === cat.id);
+          return (
+            <div key={cat.id} className="rounded-md border border-[#30363d] bg-[#0d1117] overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2">
+                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: cat.color }} />
+                <input value={cat.name} onChange={e => onUpdateCategory(cat.id, { name: e.target.value })} className="flex-1 bg-transparent text-[12px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white truncate" />
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-[#8b949e] bg-[#21262d]">{assignedEntities.length}</span>
+                <button onClick={e => { e.stopPropagation(); onRemoveCategory(cat.id); }} className="text-[#6e7681] hover:text-[#f85149] p-1 rounded hover:bg-[#f85149]/10"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+              </div>
+              {assignedEntities.length > 0 && (
+                <div className="px-3 pb-2 flex flex-wrap gap-1">
+                  {assignedEntities.map(e => (
+                    <span key={e.id} className="text-[10px] text-[#c9d1d9] bg-[#d29922]/15 border border-[#d29922]/30 rounded px-1.5 py-0.5 flex items-center gap-1">{e.name}<button onClick={() => onSetEntityCategory(e.id, null)} className="text-[#6e7681] hover:text-[#f85149]"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></span>
+                  ))}
+                </div>
+              )}
+              <div className="px-3 pb-2">
+                <select onChange={e => { if (e.target.value) onSetEntityCategory(e.target.value, cat.id); e.target.value = ''; }} value="" className="w-full text-[10px] bg-[#21262d] text-[#8b949e] border border-[#30363d] rounded px-1.5 py-1 focus:outline-none focus:border-[#d29922]/50">
+                  <option value="">+ Asignar entidad...</option>
+                  {entities.filter(e => !getCategory(e.id)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SortPanel({ entities, categories, entityCategory, onSort, onClose }) {
+  const [selectedSort, setSelectedSort] = useState(null);
+  const sortOptions = [
+    { id: 'name', label: 'Nombre (A-Z)', icon: '↓', desc: 'Orden alfabético ascendente' },
+    { id: 'nameDesc', label: 'Nombre (Z-A)', icon: '↑', desc: 'Orden alfabético descendente' },
+    { id: 'columnsAsc', label: 'Columnas (menor)', icon: '↓', desc: 'Menor cantidad de columnas primero' },
+    { id: 'columnsDesc', label: 'Columnas (mayor)', icon: '↑', desc: 'Mayor cantidad de columnas primero' },
+    { id: 'relationships', label: 'Relaciones', icon: '↗', desc: 'Organiza por grafo de relaciones' },
+    { id: 'category', label: 'Categoría', icon: '▦', desc: 'Agrupa por categoría' },
+    { id: 'color', label: 'Color', icon: '◉', desc: 'Agrupa por color de entidad' },
+    { id: 'grid3', label: 'Cuadrícula 3 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 3 columnas' },
+    { id: 'grid4', label: 'Cuadrícula 4 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 4 columnas' },
+    { id: 'grid5', label: 'Cuadrícula 5 col.', icon: '⊞', desc: 'Dispone en cuadrícula de 5 columnas' },
+  ];
+  const handleSort = (id) => { setSelectedSort(id); onSort(id); };
+  const formatDesc = (opt) => opt.id === 'category' && categories.length === 0 ? 'No hay categorías definidas' : opt.desc;
+  return (
+    <div className="absolute top-0 right-0 w-80 h-full bg-[#161b22] border-l border-[#30363d] z-30 flex flex-col">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#30363d]/50">
+        <div className="flex items-center gap-2">
+          <div className="bg-[#3fb950]/10 rounded-lg p-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></div>
+          <div><h3 className="text-[13px] font-semibold text-[#e6edf3] leading-tight">Ordenar</h3><p className="text-[11px] text-[#6e7681]">{entities.length} entidades</p></div>
+        </div>
+        <button onClick={onClose} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {sortOptions.map(opt => {
+          const disabled = opt.id === 'category' && categories.length === 0;
+          return (
+            <button key={opt.id} onClick={() => !disabled && handleSort(opt.id)}
+              className={`w-full text-left rounded-lg border transition-all ${selectedSort === opt.id ? 'bg-[#3fb950]/15 border-[#3fb950]/40 text-[#e6edf3]' : disabled ? 'bg-[#0d1117] border-[#30363d] text-[#484f58] cursor-not-allowed' : 'bg-[#0d1117] border-[#30363d] text-[#c9d1d9] hover:border-[#3fb950]/30 hover:bg-[#3fb950]/5'}`}>
+              <div className="flex items-center gap-3 px-3 py-2.5">
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold ${selectedSort === opt.id ? 'bg-[#3fb950]/20 text-[#3fb950]' : 'bg-[#21262d] text-[#6e7681]'}`}>{opt.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-[12px] font-medium ${disabled ? 'text-[#484f58]' : ''}`}>{opt.label}</div>
+                  <div className={`text-[10px] ${disabled ? 'text-[#30363d]' : 'text-[#6e7681]'}`}>{formatDesc(opt)}</div>
+                </div>
+                {selectedSort === opt.id && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#3fb950" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div className="p-3 border-t border-[#30363d]/50"><p className="text-[10px] text-[#6e7681] text-center">Selecciona un método de ordenamiento para reorganizar el diagrama</p></div>
+    </div>
+  );
+}
+
+function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActiveRel, relationMode, relationSource, onRelationClick, onDragStart, onDeleteEntity, onAddColumn, linePaths, onUpdateLinePath, onResetLinePath, onSaveLinePathState, onUndoLinePath, onPositionsChange, onSetZoom, onSetPan, selectedId, onSetSelected, selectedEntities, onSelectEntities, multiDragMode, onToggleMultiDrag, layers, onUpdateLayer, onRemoveLayer, entityCategory, categories, fitKey }) {
   const containerRef = useRef(null);
   const dragRef = useRef(null);
   const entityRefs = useRef({});
@@ -350,30 +517,89 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
   const entitiesRef = useRef(entities); entitiesRef.current = entities;
   const positionsRef = useRef(positions); positionsRef.current = positions;
   const entityDimsRef = useRef(entityDims); entityDimsRef.current = entityDims;
+  const selectedEntitiesRef = useRef(selectedEntities); selectedEntitiesRef.current = selectedEntities;
   const rafRef = useRef(null);
   const pendingMouseEvent = useRef(null);
   const zoomRef = useRef(zoom); zoomRef.current = zoom;
   const panRef = useRef(pan); panRef.current = pan;
-  const selectedIdRef = useRef(selectedId); selectedIdRef.current = selectedId;
-  const activeRelRef = useRef(activeRel); activeRelRef.current = activeRel;
   const [hoveredRel, setHoveredRel] = useState(null);
   const [selRect, setSelRect] = useState(null);
   const selRectRef = useRef(null);
+  const [activeLayerId, setActiveLayerId] = useState(null);
+  const layerDragRef = useRef(null);
+  const layerResizeRef = useRef(null);
+  const pulseTimeoutRef = useRef(null);
+  const [pulseRel, setPulseRel] = useState(null);
+  const prevEntityCount = useRef(0);
+  const prevFitKey = useRef(0);
+  const routeCacheRef = useRef({});
+
+  useEffect(() => { if (activeLayerId && !layers.find(l => l.id === activeLayerId)) setActiveLayerId(null); }, [layers, activeLayerId]);
+
+  const fitToScreen = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || entities.length === 0) return;
+    const vals = Object.values(positions).filter(Boolean);
+    if (vals.length === 0) return;
+    const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
+    const maxX = Math.max(...vals.map(p => p.x + 310)), maxY = Math.max(...vals.map(p => {
+      const e = entities.find(ent => positions[ent.id] === p);
+      return p.y + (e ? 40 + e.columns.length * 34 + 44 : 300);
+    }));
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const pad = 40;
+    const scale = Math.min((cw - pad) / (maxX - minX + 280), (ch - pad) / (maxY - minY + 200), 1.5);
+    const clamped = Math.max(0.25, Math.min(3, scale));
+    onSetZoom(clamped);
+    setPan({ x: (cw - (maxX - minX) * clamped) / 2 - minX * clamped, y: (ch - (maxY - minY) * clamped) / 2 - minY * clamped });
+  }, [entities, positions, onSetZoom]);
+
+  useEffect(() => {
+    if (prevEntityCount.current === 0 && entities.length > 0) setTimeout(fitToScreen, 50);
+    prevEntityCount.current = entities.length;
+  }, [entities, fitToScreen]);
+
+  useEffect(() => {
+    if (prevFitKey.current !== fitKey && entities.length > 0) { Promise.resolve().then(fitToScreen); prevFitKey.current = fitKey; }
+  }, [fitKey, entities, fitToScreen]);
 
   useEffect(() => {
     const dims = {};
-    for (const e of entities) {
-      const el = entityRefs.current[e.id];
-      if (el) { const r = el.getBoundingClientRect(); dims[e.id] = { w: r.width / zoom, h: r.height / zoom }; }
-    }
+    for (const e of entities) { const el = entityRefs.current[e.id]; if (el) { const r = el.getBoundingClientRect(); dims[e.id] = { w: r.width / zoom, h: r.height / zoom }; } }
     setEntityDims(dims);
   }, [entities, zoom]);
 
   const relInfo = useMemo(() => {
     const m = {};
-    for (const rel of relations) m[rel.id] = { sourceId: rel.sourceId, targetId: rel.targetId, cardinality: rel.cardinality };
+    for (const rel of relations) {
+      const src = entities.find(e => e.id === rel.sourceId);
+      const tgt = entities.find(e => e.id === rel.targetId);
+      let fkCol = null, refCol = null, fkEntityId = null, refEntityId = null;
+      if (src && tgt) {
+        const tgtFk = (tgt.columns || []).find(c => c.fk && c.refTable === src.name);
+        const srcFk = (src.columns || []).find(c => c.fk && c.refTable === tgt.name);
+        if (tgtFk) {
+          fkCol = tgtFk; fkEntityId = rel.targetId;
+          refCol = (src.columns || []).find(c => c.name === (tgtFk.refColumn || 'id')) || null; refEntityId = rel.sourceId;
+        } else if (srcFk) {
+          fkCol = srcFk; fkEntityId = rel.sourceId;
+          refCol = (tgt.columns || []).find(c => c.name === (srcFk.refColumn || 'id')) || null; refEntityId = rel.targetId;
+        }
+      }
+      m[rel.id] = { sourceId: rel.sourceId, targetId: rel.targetId, cardinality: rel.cardinality, fkCol: fkCol ? fkCol.name : null, refCol: refCol ? refCol.name : null, fkEntityId, refEntityId };
+    }
     return m;
-  }, [relations]);
+  }, [relations, entities]);
+
+  const layerShapes = useMemo(() =>
+    layers.map(layer => { const rect = layerRectPath(layer); return { ...layer, ...rect, visible: layer.visible !== false }; }),
+  [layers]);
+
+  const entityCategories = useMemo(() => {
+    const m = {};
+    for (const eid of Object.keys(entityCategory || {})) { const catId = entityCategory[eid]; const cat = categories.find(c => c.id === catId); if (cat) m[eid] = [{ name: cat.name, color: cat.color }]; }
+    return m;
+  }, [categories, entityCategory]);
 
   const svgLines = useMemo(() => {
     const lines = []; const rects = {};
@@ -381,21 +607,27 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
     for (const rel of relations) {
       const srcRect = rects[rel.sourceId]; const tgtRect = rects[rel.targetId];
       if (!srcRect || !tgtRect) continue;
-      const srcIdx = entities.find(e => e.id === rel.sourceId)?.columns.findIndex(c => c.pk) || 0;
-      const tgtIdx = entities.find(e => e.id === rel.targetId)?.columns.findIndex(c => c.pk) || 0;
+      const srcColIdx = 0; const tgtColIdx = 0;
       const obstacles = entities.filter(e2 => e2.id !== rel.sourceId && e2.id !== rel.targetId).map(e2 => rects[e2.id]).filter(Boolean);
       let points;
-      if (linePaths && linePaths[rel.id]) {
-        points = linePaths[rel.id];
-      } else {
-        points = findRoute(srcRect, srcIdx, tgtRect, tgtIdx, obstacles);
+      if (linePaths && linePaths[rel.id]) { points = linePaths[rel.id]; }
+      else {
+        const cacheKey = `${rel.id}_${srcRect.x},${srcRect.y},${srcRect.w},${srcRect.h}_${tgtRect.x},${tgtRect.y},${tgtRect.w},${tgtRect.h}`;
+        const cached = routeCacheRef.current[cacheKey];
+        if (cached) points = cached;
+        else { points = findRoute(srcRect, srcColIdx, tgtRect, tgtColIdx, obstacles); routeCacheRef.current[cacheKey] = points; if (Object.keys(routeCacheRef.current) > 200) routeCacheRef.current = {}; }
       }
       if (points) {
-        const card = rel.cardinality || '1:M';
+        const card = rel.cardinality || 'M:1';
         const sp = points.length >= 2 ? midpoint(points[0], points[1]) : points[0];
         const ep = points.length >= 2 ? midpoint(points[points.length - 2], points[points.length - 1]) : points[points.length - 1];
+        const ri = relInfo[rel.id];
+        const fkOnSource = ri && ri.fkEntityId === rel.sourceId;
         let sl, el, sm, em;
-        switch (card) { case '1:1': sl='1'; el='1'; sm='one'; em='one'; break; case '1:M': sl='1'; el='N'; sm='one'; em='many'; break; case 'M:1': sl='N'; el='1'; sm='many'; em='one'; break; case 'M:M': sl='N'; el='N'; sm='many'; em='many'; break; default: sl='N'; el='1'; sm='many'; em='one'; }
+        if (card === '1:1') { sl='1'; el='1'; sm='one'; em='one'; }
+        else if (card === 'M:M') { sl='N'; el='N'; sm='many'; em='many'; }
+        else if (fkOnSource) { sl='N'; el='1'; sm='many'; em='one'; }
+        else { sl='1'; el='N'; sm='one'; em='many'; }
         lines.push({ key: rel.id, points, startPos: sp, endPos: ep, startLabel: sl, endLabel: el, startMarker: sm, endMarker: em, cardinality: card });
       }
     }
@@ -409,24 +641,33 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
     if (relationMode) return;
     const pos = positions[entityId];
     if (!pos) return;
-    const dragInfo = { entityId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
+    const curSel = selectedEntitiesRef.current || {};
+    const entitySelected = curSel[entityId];
+    const multiCount = Object.keys(curSel).length;
+    let dragInfo;
+    if (multiDragMode) {
+      const origins = {}; for (const e of entities) { const p = positions[e.id]; if (p) origins[e.id] = { x: p.x, y: p.y }; }
+      dragInfo = { entityId, startX: e.clientX, startY: e.clientY, origins, moved: false };
+    } else if (entitySelected && multiCount > 1) {
+      const origins = {}; for (const id of Object.keys(curSel)) { const p = positions[id]; if (p) origins[id] = { x: p.x, y: p.y }; }
+      dragInfo = { entityId, startX: e.clientX, startY: e.clientY, origins, moved: false };
+    } else dragInfo = { entityId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
     if (linePaths) {
-      const dragNames = new Set([entities.find(e => e.id === entityId)?.name]);
+      const dragIds = dragInfo.origins ? Object.keys(dragInfo.origins) : [entityId];
       const affected = {};
       for (const [key, pts] of Object.entries(linePaths)) {
         const rel = relations.find(r => r.id === key);
         if (!rel) continue;
         const indices = [];
-        if (rel.sourceId === entityId) indices.push(0);
-        if (rel.targetId === entityId) indices.push(pts.length - 1);
+        if (dragIds.includes(rel.sourceId)) indices.push(0);
+        if (dragIds.includes(rel.targetId)) indices.push(pts.length - 1);
         if (indices.length > 0) affected[key] = { pts: pts.map(p => ({...p})), indices };
       }
       dragInfo.affectedLinePaths = affected;
     }
     dragRef.current = dragInfo;
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [positions, entities, relations, linePaths, relationMode, handleMouseMove, handleMouseUp]);
+    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+  }, [positions, entities, relations, linePaths, relationMode, multiDragMode, handleMouseMove, handleMouseUp]);
 
   const handleWaypointMove = useCallback((e) => {
     const dr = waypointDragRef.current;
@@ -439,8 +680,7 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
       let np = orig.map((p, i) => i === pi ? { x: p.x + dx, y: p.y + dy } : { ...p });
       const rel = relations.find(r => r.id === dr.relId);
       if (rel) np = snapEndpointsToEntity(np, rel.sourceId, rel.targetId, entitiesRef.current, positionsRef.current, entityDimsRef.current);
-      onUpdateLinePath(dr.relId, np);
-      return;
+      onUpdateLinePath(dr.relId, np); return;
     }
     const eps = 0.5;
     const pH = Math.abs(orig[pi - 1].y - orig[pi].y) < eps;
@@ -491,16 +731,14 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
 
   const processMouseEvent = useCallback((e) => {
     if (dragRef.current) {
-      const dr = dragRef.current;
-      const dx = (e.clientX - dr.startX) / zoomRef.current;
-      const dy = (e.clientY - dr.startY) / zoomRef.current;
+      const dr = dragRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
       if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
-      onPositionsChange(dr.entityId, dr.origX + dx, dr.origY + dy);
+      if (dr.origins) { for (const id of Object.keys(dr.origins)) onPositionsChange(id, dr.origins[id].x + dx, dr.origins[id].y + dy); }
+      else onPositionsChange(dr.entityId, dr.origX + dx, dr.origY + dy);
       if (dr.affectedLinePaths) {
         for (const [key, { pts: origPts, indices }] of Object.entries(dr.affectedLinePaths)) {
           const np = origPts.map((p, i) => indices.includes(i) ? { x: p.x + dx, y: p.y + dy } : { ...p });
-          for (const idx of indices) {
-            const eps = 0.5;
+          for (const idx of indices) { const eps = 0.5;
             if (idx === 0 && np.length >= 2) { if (Math.abs(origPts[0].y - origPts[1].y) < eps) np[1].y = np[0].y; else np[1].x = np[0].x; }
             if (idx === np.length - 1 && np.length >= 2) { const last = np.length - 1; if (Math.abs(origPts[last - 1].y - origPts[last].y) < eps) np[last - 1].y = np[last].y; else np[last - 1].x = np[last].x; }
           }
@@ -511,12 +749,22 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
       }
       return;
     }
-    if (panDragRef.current) {
-      onSetPan({ x: panDragRef.current.origPanX + (e.clientX - panDragRef.current.startX), y: panDragRef.current.origPanY + (e.clientY - panDragRef.current.startY) });
+    if (panDragRef.current) { onSetPan({ x: panDragRef.current.origPanX + (e.clientX - panDragRef.current.startX), y: panDragRef.current.origPanY + (e.clientY - panDragRef.current.startY) }); }
+    if (layerResizeRef.current) {
+      const dr = layerResizeRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
+      const upd = {}; const minW = 100, minH = 60;
+      if (dr.sx === 1) upd.w = Math.max(minW, dr.origW + dx); else { upd.x = dr.origX + dx; upd.w = Math.max(minW, dr.origW - dx); }
+      if (dr.sy === 1) upd.h = Math.max(minH, dr.origH + dy); else { upd.y = dr.origY + dy; upd.h = Math.max(minH, dr.origH - dy); }
+      onUpdateLayer(dr.layerId, upd); if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true; return;
+    }
+    if (layerDragRef.current) {
+      const dr = layerDragRef.current; const dx = (e.clientX - dr.startX) / zoomRef.current; const dy = (e.clientY - dr.startY) / zoomRef.current;
+      if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
+      onUpdateLayer(dr.layerId, { x: dr.origX + dx, y: dr.origY + dy }); return;
     }
     const wdr = waypointDragRef.current;
     if (wdr) handleWaypointMove(e);
-  }, [onPositionsChange, handleWaypointMove, onUpdateLinePath, onSetPan, relations]);
+  }, [onPositionsChange, handleWaypointMove, onUpdateLinePath, onSetPan, onUpdateLayer]);
 
   const handleMouseMove = useCallback((e) => {
     if (selRectRef.current) {
@@ -525,47 +773,41 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
       const mx = (e.clientX - rect.left - panRef.current.x) / zoomRef.current;
       const my = (e.clientY - rect.top - panRef.current.y) / zoomRef.current;
       selRectRef.current = { ...selRectRef.current, endX: mx, endY: my };
-      setSelRect({ ...selRectRef.current });
-      return;
+      setSelRect({ ...selRectRef.current }); return;
     }
     pendingMouseEvent.current = e;
     if (!rafRef.current) {
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         const ev = pendingMouseEvent.current;
-        if (ev && (dragRef.current || panDragRef.current || waypointDragRef.current)) processMouseEvent(ev);
+        if (ev && (dragRef.current || panDragRef.current || waypointDragRef.current || layerResizeRef.current || layerDragRef.current)) processMouseEvent(ev);
       });
     }
   }, [processMouseEvent]);
 
   const handleMouseUp = useCallback((e) => {
+    layerResizeRef.current = null; layerDragRef.current = null;
     if (waypointDragRef.current) { waypointDragRef.current = null; }
     if (selRectRef.current) {
       const r = selRectRef.current;
       const minX = Math.min(r.startX, r.endX), maxX = Math.max(r.startX, r.endX);
       const minY = Math.min(r.startY, r.endY), maxY = Math.max(r.startY, r.endY);
       selRectRef.current = null; setSelRect(null);
+      const ids = [];
       if (maxX - minX > 5 || maxY - minY > 5) {
-        const ids = [];
-        for (const e of entitiesRef.current) {
-          const p = positionsRef.current[e.id]; if (!p) continue;
-          const h = 40 + e.columns.length * 34 + 44;
-          if (p.x < maxX && p.x + 310 > minX && p.y < maxY && p.y + h > minY) ids.push(e.id);
-        }
-        if (ids.length > 0) onSetSelected(ids[0]);
+        for (const e of entitiesRef.current) { const p = positionsRef.current[e.id]; if (!p) continue; const h = 40 + e.columns.length * 34 + 44; if (p.x < maxX && p.x + 310 > minX && p.y < maxY && p.y + h > minY) ids.push(e.id); }
       }
+      if (ids.length > 0 && onSelectEntities) onSelectEntities(ids);
     }
     if (dragRef.current) {
-      if (!dragRef.current.moved && e.target.closest('.table-card')) {
-        if (!relationMode) onSetSelected(dragRef.current.entityId);
-      }
+      if (!dragRef.current.moved && e.target.closest('.table-card')) { if (!relationMode) onSetSelected(dragRef.current.entityId); }
       dragRef.current = null;
     }
     if (panDragRef.current) { panDragRef.current = null; setIsPanning(false); }
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     pendingMouseEvent.current = null;
     document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp);
-  }, [onSetSelected, relationMode, handleMouseMove, handleMouseUp]);
+  }, [onSetSelected, onSelectEntities, relationMode, handleMouseMove, handleMouseUp]);
 
   useEffect(() => { return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); }; }, [handleMouseMove, handleMouseUp]);
 
@@ -579,24 +821,53 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
     document.addEventListener('mouseup', handleMouseUp);
   }, [linePaths, svgLines, handleMouseMove, handleMouseUp, onSaveLinePathState]);
 
+  const handleLayerMouseDown = useCallback((e, layerId) => {
+    if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
+    setActiveLayerId(layerId);
+    layerDragRef.current = { layerId, startX: e.clientX, startY: e.clientY, origX: layer.x, origY: layer.y, moved: false };
+    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+  }, [layers, handleMouseMove, handleMouseUp]);
+
+  const handleLayerResizeDown = useCallback((e, layerId, sx, sy) => {
+    if (e.button !== 0) return; e.stopPropagation(); const layer = layers.find(l => l.id === layerId); if (!layer) return;
+    setActiveLayerId(layerId);
+    layerResizeRef.current = { layerId, startX: e.clientX, startY: e.clientY, sx, sy, origX: layer.x, origY: layer.y, origW: layer.w, origH: layer.h };
+    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+  }, [layers, handleMouseMove, handleMouseUp]);
+
   const handleCanvasMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
     if (e.target.closest('.table-card') || e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea')) return;
-    setActiveRel(null);
+    if (e.target.closest('.layer-hit')) return; if (e.target.closest('.layer-handle')) return;
+    setActiveLayerId(null); setActiveRel(null);
     if (relationMode) { onRelationClick(null); return; }
+    if (multiDragMode) {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const mx = (e.clientX - rect.left - pan.x) / zoom;
+      const my = (e.clientY - rect.top - pan.y) / zoom;
+      selRectRef.current = { startX: mx, startY: my, endX: mx, endY: my };
+      setSelRect({ startX: mx, startY: my, endX: mx, endY: my });
+      document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+      return;
+    }
     onSetSelected(null);
     panDragRef.current = { startX: e.clientX, startY: e.clientY, origPanX: pan.x, origPanY: pan.y };
-    setIsPanning(true);
-    document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
-  }, [pan.x, pan.y, relationMode, onRelationClick, onSetSelected, handleMouseMove, handleMouseUp]);
+    setIsPanning(true); document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp);
+  }, [pan.x, pan.y, relationMode, multiDragMode, zoom, onRelationClick, onSetSelected, handleMouseMove, handleMouseUp]);
 
   const canvasBounds = useMemo(() => {
+    const container = containerRef.current;
+    const cw = container?.clientWidth || 1200;
+    const ch = container?.clientHeight || 800;
+    const PAD = 1200;
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const PAD = 800;
     for (const e of entities) { const p = positions[e.id]; if (!p) continue; const h = 40 + e.columns.length * 34 + 44; minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x + 310); maxY = Math.max(maxY, p.y + h); }
-    if (!isFinite(minX)) return { width: 1200, height: 800 };
-    return { width: Math.max(maxX - minX + PAD * 2, 1200), height: Math.max(maxY - minY + PAD * 2, 800) };
-  }, [entities, positions]);
+    for (const layer of layers) { if (layer.visible === false) continue; minX = Math.min(minX, layer.x); minY = Math.min(minY, layer.y); maxX = Math.max(maxX, layer.x + layer.w); maxY = Math.max(maxY, layer.y + layer.h); }
+    const w = isFinite(maxX) ? maxX - minX + PAD * 2 : cw;
+    const h = isFinite(maxY) ? maxY - minY + PAD * 2 : ch;
+    return { width: Math.max(w, cw), height: Math.max(h, ch) };
+  }, [entities, positions, layers]);
 
   return (
     <div ref={containerRef}
@@ -606,54 +877,141 @@ function Diagram({ entities, relations, positions, zoom, pan, activeRel, setActi
       <div className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
         <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ overflow: 'visible', zIndex: 0 }}>
           <defs>
-            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
             <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
-            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="one-marker-end" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="one-marker-end-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
             <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
-            <marker id="many-marker-end" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.5" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.5" /></marker>
+            <marker id="many-marker-end" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
             <marker id="many-marker-end-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
             <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            <filter id="layer-glow"><feGaussianBlur stdDeviation="20" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            <filter id="layer-glow-inner"><feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
           </defs>
           {entities.length > 0 && <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="transparent" stroke="rgba(139,148,158,0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />}
           {entities.length > 0 && (() => { const c = '#8b949e', o = 0.4, s = 24, g = 4, w = canvasBounds.width, h = canvasBounds.height; return (<g opacity={o} stroke={c} strokeWidth="2" fill="none" style={{ pointerEvents: 'none' }}><path d={`M${g},${g + s} L${g},${g} L${g + s},${g}`} /><path d={`M${w - g - s},${g} L${w - g},${g} L${w - g},${g + s}`} /><path d={`M${g},${h - g - s} L${g},${h - g} L${g + s},${h - g}`} /><path d={`M${w - g - s},${h - g} L${w - g},${h - g} L${w - g},${h - g - s}`} /></g>); })()}
+          {selRect && (() => { const x = Math.min(selRect.startX, selRect.endX); const y = Math.min(selRect.startY, selRect.endY); const w = Math.abs(selRect.endX - selRect.startX); const h = Math.abs(selRect.endY - selRect.startY); return <rect x={x} y={y} width={w} height={h} fill="rgba(88, 166, 255, 0.08)" stroke="rgba(88, 166, 255, 0.6)" strokeWidth="1.5" strokeDasharray="5 3" rx="3" ry="3" style={{ pointerEvents: 'none' }} />; })()}
+          {layerShapes.filter(ls => ls.visible !== false).map(ls => (
+            <g key={ls.id}>
+              <path d={ls.path} fill={ls.color} fillOpacity="0.04" filter="url(#layer-glow)" style={{ pointerEvents: 'none' }} />
+              <path d={ls.path} fill={ls.color} fillOpacity="0.08" style={{ pointerEvents: 'none' }} />
+              <path d={ls.path} fill="none" stroke={ls.color} strokeWidth="0.5" strokeOpacity="0.12" transform="translate(0, 1)" style={{ pointerEvents: 'none' }} />
+              <path d={ls.path} fill="none" stroke={ls.color} strokeWidth="1" strokeOpacity={activeLayerId === ls.id ? '0.6' : '0.3'} strokeDasharray={activeLayerId === ls.id ? 'none' : '6 4'} style={{ pointerEvents: 'none' }} />
+              <path d={ls.path} fill="transparent" stroke="transparent" strokeWidth="8" className="layer-hit" style={{ pointerEvents: 'all', cursor: 'grab' }} onMouseDown={e => handleLayerMouseDown(e, ls.id)} />
+              {activeLayerId === ls.id && <><path d={ls.path} fill="none" stroke={ls.color} strokeWidth="2.5" strokeOpacity="0.6" filter="url(#layer-glow-inner)" style={{ pointerEvents: 'none' }} /><rect x={ls.x} y={ls.y} width={ls.w} height={ls.h} fill="none" stroke={ls.color} strokeWidth="1" strokeOpacity="0.15" rx="12" ry="12" style={{ pointerEvents: 'none' }} /></>}
+              {activeLayerId === ls.id && [-1, 1].flatMap(sx => [-1, 1].map(sy => {
+                const hx = sx === -1 ? ls.x : ls.x + ls.w; const hy = sy === -1 ? ls.y : ls.y + ls.h;
+                return (<g key={`${sx},${sy}`}><rect x={hx - 5} y={hy - 5} width="10" height="10" rx="2" ry="2" fill="#1c2128" stroke={ls.color} strokeWidth="2" opacity="0.9" className="layer-handle" style={{ pointerEvents: 'all', cursor: `${sy === -1 ? 'n' : 's'}${sx === -1 ? 'w' : 'e'}-resize` }} onMouseDown={e => handleLayerResizeDown(e, ls.id, sx, sy)} /><rect x={hx - 2} y={hy - 2} width="4" height="4" rx="0.5" ry="0.5" fill={ls.color} opacity="0.6" style={{ pointerEvents: 'none' }} /></g>);
+              }))}
+              {activeLayerId === ls.id && (<text x={ls.cx} y={ls.y - 18} textAnchor="middle" fill={ls.color} fontSize="11" fontWeight="600" opacity="0.7" style={{ pointerEvents: 'none', userSelect: 'none' }}>{ls.name}</text>)}
+            </g>
+          ))}
           {svgLines.map(l => {
             const isActive = activeRel === l.key; const isHovered = hoveredRel === l.key; const hl = isActive || isHovered;
             const pathStr = pointsToAngularPath(l.points);
+            const L = 8;
+            const pts = l.points;
+            let markerD = '';
+            if (pts.length >= 2) {
+              const p0 = pts[0], p1 = pts[1], pn = pts[pts.length - 2], pp = pts[pts.length - 1];
+              const aStart = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+              const aEnd = Math.atan2(pp.y - pn.y, pp.x - pn.x);
+              const [sx, sy] = [Math.cos(aStart), Math.sin(aStart)];
+              const [ex, ey] = [Math.cos(aEnd), Math.sin(aEnd)];
+              const [psx, psy] = [Math.cos(aStart + Math.PI / 2), Math.sin(aStart + Math.PI / 2)];
+              const [pex, pey] = [Math.cos(aEnd + Math.PI / 2), Math.sin(aEnd + Math.PI / 2)];
+              if (l.startMarker === 'one') markerD += `M${(p0.x + psx * L * 0.7).toFixed(1)},${(p0.y + psy * L * 0.7).toFixed(1)} L${(p0.x - psx * L * 0.7).toFixed(1)},${(p0.y - psy * L * 0.7).toFixed(1)} `;
+              if (l.startMarker === 'many') { const f = L * 0.7, s = L * 0.7; const cx = p0.x + sx * f, cy = p0.y + sy * f; markerD += `M${(p0.x + psx * s).toFixed(1)},${(p0.y + psy * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} M${(p0.x - psx * s).toFixed(1)},${(p0.y - psy * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} M${p0.x},${p0.y} L${cx.toFixed(1)},${cy.toFixed(1)} `; }
+              if (l.endMarker === 'one') markerD += `M${(pp.x + pex * L * 0.7).toFixed(1)},${(pp.y + pey * L * 0.7).toFixed(1)} L${(pp.x - pex * L * 0.7).toFixed(1)},${(pp.y - pey * L * 0.7).toFixed(1)} `;
+              if (l.endMarker === 'many') { const f = L * 0.7, s = L * 0.7; const cx = pp.x - ex * f, cy = pp.y - ey * f; markerD += `M${(pp.x + pex * s).toFixed(1)},${(pp.y + pey * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} M${(pp.x - pex * s).toFixed(1)},${(pp.y - pey * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)} M${pp.x},${pp.y} L${cx.toFixed(1)},${cy.toFixed(1)} `; }
+            }
             return (
               <g key={l.key}>
                 <path d={pathStr} stroke="transparent" strokeWidth={hl ? 28 : 20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer', transition: 'stroke-width 0.35s ease' }}
-                  onMouseDown={e => { if (isActive) handleLineMouseDown(e, l.key, l.points); else setActiveRel(l.key); }}
+                  onMouseDown={e => { if (isActive) handleLineMouseDown(e, l.key, l.points); else setActiveRel(l.key); if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseRel(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseRel(null), 2400); }}
                   onMouseEnter={() => setHoveredRel(l.key)} onMouseLeave={() => setHoveredRel(h => h === l.key ? null : h)} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={hl ? 0.65 : 0.3} fill="none"
-                  markerStart={`url(#${l.startMarker}-marker${hl ? '-hl' : ''})`} markerEnd={`url(#${l.endMarker}-marker-end${hl ? '-hl' : ''})`}
-                  style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={4} fill="none" filter="url(#glow)" opacity={hl ? 0.3 : 0}
-                  style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
-                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 4 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={hl ? 0.7 : 0.4} fill="none"
-                  style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={hl ? 0.85 : 0.5} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={4} fill="none" filter="url(#glow)" opacity={hl ? 0.3 : 0} style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={hl ? 4 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={hl ? 0.7 : 0.4} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                {markerD && <path d={markerD} stroke="#ffffff" strokeWidth={hl ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" opacity={hl ? 0.85 : 0.5} fill="none" style={{ pointerEvents: 'none' }} />}
                 {(isActive || isHovered) && l.points.map((p, pi) => {
                   const isEp = pi === 0 || pi === l.points.length - 1;
-                  return (
-                    <g key={`h-${pi}`}>
-                      <circle cx={p.x} cy={p.y} r={isEp ? 4 : 5} fill={isEp ? '#ffffff' : '#c4b5fd'} stroke={isEp ? '#4f46e5' : '#a371f7'} strokeWidth={2} opacity={1}
-                        filter={!isEp ? 'url(#glow)' : undefined} style={{ cursor: 'grab', pointerEvents: 'all' }}
-                        onMouseDown={e => handleWpMouseDown(e, l.key, pi)} onDoubleClick={e => handleWaypointDblClick(e, l.key, pi, l.points)} />
-                      {!isEp && <circle cx={p.x} cy={p.y} r={2.5} fill="#7c3aed" opacity={0.6} style={{ pointerEvents: 'none' }} />}
-                    </g>
-                  );
+                  return (<g key={`h-${pi}`}>
+                    <circle cx={p.x} cy={p.y} r={isEp ? 4 : 5} fill={isEp ? '#ffffff' : '#c4b5fd'} stroke={isEp ? '#4f46e5' : '#a371f7'} strokeWidth={isEp ? 1.5 : 2} opacity={1}
+                      filter={!isEp ? 'url(#glow)' : undefined} style={{ cursor: 'grab', pointerEvents: 'all' }}
+                      onMouseDown={e => handleWpMouseDown(e, l.key, pi)} onDoubleClick={e => handleWaypointDblClick(e, l.key, pi, l.points)} />
+                    {!isEp && <circle cx={p.x} cy={p.y} r={2.5} fill="#7c3aed" opacity={0.6} style={{ pointerEvents: 'none' }} />}
+                  </g>);
                 })}
               </g>
             );
           })}
         </svg>
+        {activeLayerId && (() => {
+          const layer = layers.find(l => l.id === activeLayerId); if (!layer) return null;
+          const px = pan.x + (layer.x + layer.w / 2) * zoom; const py = pan.y + layer.y * zoom - 8;
+          return (<div className="absolute z-30" style={{ left: px, top: py, transform: 'translate(-50%, -100%)' }} onMouseDown={e => e.stopPropagation()}>
+            <div className="bg-[#21262d]/95 backdrop-blur-sm border border-[#30363d]/60 rounded-xl shadow-2xl p-3 min-w-[210px]" style={{ borderLeftColor: layer.color, borderLeftWidth: '3px' }}>
+              <div className="flex items-center gap-2 mb-2.5">
+                <div className="w-3 h-3 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: layer.color }} />
+                <input value={layer.name} onChange={e => onUpdateLayer(layer.id, { name: e.target.value })} onClick={e => e.stopPropagation()} className="flex-1 bg-transparent text-[13px] text-[#c9d1d9] font-semibold focus:outline-none focus:text-white" />
+                <button onClick={() => setActiveLayerId(null)} className="text-[#6e7681] hover:text-[#c9d1d9] p-1 rounded-md hover:bg-[#30363d]/50"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+              </div>
+              <div className="flex items-center gap-3 mb-2.5 p-2 bg-[#161b22]/80 rounded-lg">
+                <div className="flex items-center gap-1.5"><input type="color" value={layer.color} onChange={e => onUpdateLayer(layer.id, { color: e.target.value })} className="w-5 h-5 rounded cursor-pointer border-0 p-0" /><span className="text-[10px] text-[#6e7681]">Color</span></div>
+                <div className="w-px h-4 bg-[#30363d]" />
+                <button onClick={e => { e.stopPropagation(); onUpdateLayer(layer.id, { visible: !(layer.visible !== false) }); }} className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded ${layer.visible !== false ? 'text-[#8b949e] hover:text-[#e6edf3] bg-[#30363d]/30' : 'text-[#484f58] bg-[#21262d]'}`}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">{layer.visible !== false ? <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></> : <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></>}</svg>
+                  {layer.visible !== false ? 'Visible' : 'Oculto'}</button>
+              </div>
+              <div className="flex gap-2 mt-2 pt-2 border-t border-[#30363d]/50">
+                <button onClick={() => { onRemoveLayer(layer.id); setActiveLayerId(null); }} className="text-[10px] text-[#f85149] hover:bg-[#f85149]/10 rounded px-2 py-1 flex items-center gap-1"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg> Eliminar</button>
+              </div>
+            </div>
+          </div>);
+        })()}
         {entities.map(e => (
           <EntityCard key={e.id} ref={el => entityRefs.current[e.id] = el}
             entity={e} position={positions[e.id] || { x: 0, y: 0 }} selected={selectedId === e.id}
             onSelect={() => onRelationClick(e.id)} onDragStart={handleMouseDown} onDelete={onDeleteEntity} onAddColumn={onAddColumn}
-            activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={null}
-            relationMode={relationMode} isRelSrc={relationSource === e.id} isRelTgt={false} />
+            activeRel={activeRel} hoveredRel={hoveredRel} relInfo={relInfo} pulseRel={pulseRel}
+            relationMode={relationMode} isRelSrc={relationSource === e.id} isRelTgt={false}
+            categories={entityCategories[e.id]} />
         ))}
       </div>
+      {entities.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center opacity-60">
+            <div className="bg-[#1f6feb]/10 rounded-2xl p-4 w-fit mx-auto mb-5">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" strokeWidth="1.2">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><line x1="10" y1="6.5" x2="14" y2="6.5"/><line x1="6.5" y1="10" x2="6.5" y2="14"/><line x1="17.5" y1="10" x2="17.5" y2="14"/><line x1="10" y1="17.5" x2="14" y2="17.5"/></svg>
+            </div>
+            <h2 className="text-xl font-bold text-[#c9d1d9] mb-2">Diagram Creator</h2>
+            <p className="text-sm text-[#8b949e] max-w-xs mx-auto leading-relaxed">Modela tus bases de datos visualmente.<br/>Haz clic en \"Entidad\" para comenzar.</p>
+          </div>
+        </div>
+      )}
+      {entities.length > 0 && (
+        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90 backdrop-blur-sm border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
+          <button onClick={onToggleMultiDrag}
+            className={`rounded-lg w-9 h-9 flex items-center justify-center ${multiDragMode ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#8b949e] bg-[#30363d]/50'}`}
+            title={multiDragMode ? 'Seleccionar área activado' : 'Seleccionar área'}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" strokeDasharray="4 2" /></svg>
+          </button>
+          {selectedEntities && Object.keys(selectedEntities).length > 0 && (
+            <button onClick={() => onSelectEntities([])} className="rounded-lg w-9 h-9 flex items-center justify-center text-[#f85149] bg-[#f85149]/10 hover:bg-[#f85149]/20" title="Deseleccionar todo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+          <button onClick={fitToScreen} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center" title="Ajustar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+          <button onClick={() => onSetZoom(z => Math.max(0.25, z - 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">-</button>
+          <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => onSetZoom(z => Math.min(3, z + 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">+</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -671,6 +1029,17 @@ function App() {
   const [activeRel, setActiveRel] = useState(null);
   const [linePaths, setLinePaths] = useState({});
   const [linePathHistory, setLinePathHistory] = useState({});
+  const [selectedEntities, setSelectedEntities] = useState({});
+  const [multiDragMode, setMultiDragMode] = useState(false);
+  const [layers, setLayers] = useState([]);
+  const [showLayers, setShowLayers] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [entityCategory, setEntityCategory] = useState({});
+  const [showCategories, setShowCategories] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
+  const [sortFitKey, setSortFitKey] = useState(0);
+  const [showLeft, setShowLeft] = useState(true);
+  const fileInputRef = useRef(null);
   const entityColors = ['#6366f1','#ec4899','#22c55e','#f59e0b','#06b6d4','#8b5cf6','#f97316','#84cc16'];
 
   const addEntity = useCallback(() => {
@@ -690,7 +1059,7 @@ function App() {
   }, [relations]);
 
   const addColumn = useCallback((eid) => {
-    setEntities(prev => prev.map(e => e.id === eid ? { ...e, columns: [...e.columns, { id: uid(), name: '', type: 'VARCHAR', length: 255, values: '', pk: false, nn: false, uq: false, ai: false }] } : e));
+    setEntities(prev => prev.map(e => e.id === eid ? { ...e, columns: [...e.columns, { id: uid(), name: '', type: 'VARCHAR', length: 255, values: '', pk: false, nn: false, uq: false, ai: false, fk: false, refTable: '', refColumn: '' }] } : e));
   }, []);
 
   const updateColumn = useCallback((eid, colId, upd) => {
@@ -713,7 +1082,7 @@ function App() {
     const exists = relations.some(r => r.sourceId === relationSource && r.targetId === entityId);
     if (!exists) {
       const id = uid();
-      setRelations(prev => [...prev, { id, sourceId: relationSource, targetId: entityId, cardinality: '1:M' }]);
+      setRelations(prev => [...prev, { id, sourceId: relationSource, targetId: entityId, cardinality: 'M:1' }]);
       setActiveRel(id);
     }
     setRelationSource(null);
@@ -760,6 +1129,101 @@ function App() {
     setLinePaths(prev => { const n = { ...prev }; delete n[id]; return n; });
   }, []);
 
+  const handleSelectEntities = useCallback((ids) => {
+    setSelectedEntities(prev => {
+      const next = {};
+      for (const id of ids) next[id] = true;
+      return next;
+    });
+  }, []);
+
+  const addLayer = useCallback(() => {
+    const colors = ['#6366f1','#ec4899','#22c55e','#f59e0b','#06b6d4','#8b5cf6','#f97316','#84cc16'];
+    setLayers(prev => { const idx = prev.length; const offset = idx * 30; return [...prev, { id: uid(), name: `Capa ${idx + 1}`, color: colors[idx % colors.length], visible: true, x: 120 + offset, y: 80 + offset, w: 350, h: 250 }]; });
+  }, []);
+
+  const removeLayer = useCallback((id) => setLayers(prev => prev.filter(l => l.id !== id)), []);
+  const updateLayer = useCallback((id, updates) => setLayers(prev => prev.map(l => l.id === id ? { ...l, ...updates } : l)), []);
+
+  const addCategory = useCallback(() => {
+    const catColors = ['#d29922','#58a6ff','#3fb950','#f85149','#bc8cff','#f0883e','#79c0ff','#56d364'];
+    setCategories(prev => [...prev, { id: uid(), name: `Categoría ${prev.length + 1}`, color: catColors[prev.length % catColors.length] }]);
+  }, []);
+
+  const removeCategory = useCallback((id) => {
+    setCategories(prev => prev.filter(c => c.id !== id));
+    setEntityCategory(prev => { const p = { ...prev }; for (const k of Object.keys(p)) { if (p[k] === id) delete p[k]; } return p; });
+  }, []);
+
+  const updateCategory = useCallback((id, updates) => setCategories(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c)), []);
+
+  const setEntityCategoryId = useCallback((entityId, categoryId) => {
+    setEntityCategory(prev => {
+      if (!categoryId) { const p = { ...prev }; delete p[entityId]; return p; }
+      return { ...prev, [entityId]: categoryId };
+    });
+  }, []);
+
+  const handleSort = useCallback((sortId) => {
+    const currentEntities = entities;
+    if (currentEntities.length === 0) return;
+    const tables = convertEntitiesToTables(currentEntities, relations);
+    let newPos;
+    switch (sortId) {
+      case 'name': newPos = sortByName(tables); break;
+      case 'nameDesc': newPos = sortByNameDesc(tables); break;
+      case 'columnsAsc': newPos = sortByColumns(tables, true); break;
+      case 'columnsDesc': newPos = sortByColumns(tables, false); break;
+      case 'relationships': newPos = arrangeTables(tables, positions); break;
+      case 'category': newPos = sortByCategory(tables, entityCategory, categories); break;
+      case 'color': newPos = sortByColor(tables); break;
+      case 'grid3': newPos = sortGrid(tables, 3); break;
+      case 'grid4': newPos = sortGrid(tables, 4); break;
+      case 'grid5': newPos = sortGrid(tables, 5); break;
+      default: return;
+    }
+    setPositions(newPos);
+    setLinePaths({});
+    setSortFitKey(k => k + 1);
+  }, [entities, relations, positions, entityCategory, categories]);
+
+  const handleExportPNG = useCallback(() => exportPNG(`diagrama-${Date.now()}.png`), []);
+  const handleExportPDF = useCallback(() => exportPDF(`diagrama-${Date.now()}.pdf`), []);
+
+  const handleExportJSON = useCallback(() => {
+    const data = { entities, relations, positions, zoom, pan, layers, categories, entityCategory, linePaths };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `diagrama-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  }, [entities, relations, positions, zoom, pan, layers, categories, entityCategory, linePaths]);
+
+  const handleImportJSON = useCallback((e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.entities) setEntities(data.entities);
+        if (data.relations) setRelations(data.relations);
+        if (data.positions) setPositions(data.positions);
+        if (data.zoom !== undefined) setZoom(data.zoom);
+        if (data.pan) setPan(data.pan);
+        if (data.layers) setLayers(data.layers);
+        if (data.categories) setCategories(data.categories);
+        if (data.entityCategory) setEntityCategory(data.entityCategory);
+        if (data.linePaths) setLinePaths(data.linePaths);
+      } catch (err) { console.error('Error importing JSON:', err); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }, []);
+
   const fitToScreen = useCallback(() => {
     const container = document.querySelector('.diagram-container');
     if (!container || entities.length === 0) return;
@@ -779,6 +1243,67 @@ function App() {
     firstEntityCount.current = entities.length;
   }, [entities, fitToScreen]);
 
+  const handleLoadDemo = useCallback(() => {
+    const colors = entityColors;
+    const e1 = { id: uid(), name: 'clientes', color: colors[0], columns: [
+      { id: uid(), name: 'id', type: 'INT', length: 11, values: '', pk: true, nn: true, uq: true, ai: true },
+      { id: uid(), name: 'nombre', type: 'VARCHAR', length: 100, values: '', pk: false, nn: true, uq: false, ai: false },
+      { id: uid(), name: 'email', type: 'VARCHAR', length: 255, values: '', pk: false, nn: false, uq: true, ai: false },
+      { id: uid(), name: 'telefono', type: 'VARCHAR', length: 20, values: '', pk: false, nn: false, uq: false, ai: false },
+      { id: uid(), name: 'fecha_registro', type: 'DATE', length: 0, values: '', pk: false, nn: false, uq: false, ai: false },
+      { id: uid(), name: 'activo', type: 'BOOLEAN', length: 0, values: '', pk: false, nn: false, uq: false, ai: false }
+    ]};
+    const e2 = { id: uid(), name: 'categorias', color: colors[1], columns: [
+      { id: uid(), name: 'id', type: 'INT', length: 11, values: '', pk: true, nn: true, uq: true, ai: true },
+      { id: uid(), name: 'nombre', type: 'VARCHAR', length: 100, values: '', pk: false, nn: true, uq: false, ai: false },
+      { id: uid(), name: 'descripcion', type: 'TEXT', length: 0, values: '', pk: false, nn: false, uq: false, ai: false }
+    ]};
+    const e3 = { id: uid(), name: 'productos', color: colors[2], columns: [
+      { id: uid(), name: 'id', type: 'INT', length: 11, values: '', pk: true, nn: true, uq: true, ai: true },
+      { id: uid(), name: 'nombre', type: 'VARCHAR', length: 200, values: '', pk: false, nn: true, uq: false, ai: false },
+      { id: uid(), name: 'precio', type: 'DECIMAL', length: 10, values: '2', pk: false, nn: true, uq: false, ai: false },
+      { id: uid(), name: 'stock', type: 'INT', length: 11, values: '', pk: false, nn: false, uq: false, ai: false },
+      { id: uid(), name: 'categoria_id', type: 'INT', length: 11, values: '', pk: false, nn: false, uq: false, ai: false, fk: true, refTable: 'categorias', refColumn: 'id' }
+    ]};
+    const e4 = { id: uid(), name: 'pedidos', color: colors[3], columns: [
+      { id: uid(), name: 'id', type: 'INT', length: 11, values: '', pk: true, nn: true, uq: true, ai: true },
+      { id: uid(), name: 'cliente_id', type: 'INT', length: 11, values: '', pk: false, nn: true, uq: false, ai: false, fk: true, refTable: 'clientes', refColumn: 'id' },
+      { id: uid(), name: 'fecha', type: 'DATETIME', length: 0, values: '', pk: false, nn: false, uq: false, ai: false },
+      { id: uid(), name: 'total', type: 'DECIMAL', length: 10, values: '2', pk: false, nn: false, uq: false, ai: false },
+      { id: uid(), name: 'estado', type: 'VARCHAR', length: 20, values: '', pk: false, nn: false, uq: false, ai: false }
+    ]};
+    const e5 = { id: uid(), name: 'pedido_productos', color: colors[4], columns: [
+      { id: uid(), name: 'id', type: 'INT', length: 11, values: '', pk: true, nn: true, uq: true, ai: true },
+      { id: uid(), name: 'pedido_id', type: 'INT', length: 11, values: '', pk: false, nn: true, uq: false, ai: false, fk: true, refTable: 'pedidos', refColumn: 'id' },
+      { id: uid(), name: 'producto_id', type: 'INT', length: 11, values: '', pk: false, nn: true, uq: false, ai: false, fk: true, refTable: 'productos', refColumn: 'id' },
+      { id: uid(), name: 'cantidad', type: 'INT', length: 11, values: '', pk: false, nn: true, uq: false, ai: false },
+      { id: uid(), name: 'precio_unitario', type: 'DECIMAL', length: 10, values: '2', pk: false, nn: false, uq: false, ai: false }
+    ]};
+    const demoEntities = [e1, e2, e3, e4, e5];
+    const demoPositions = {
+      [e1.id]: { x: 60, y: 180 },
+      [e2.id]: { x: 440, y: 180 },
+      [e3.id]: { x: 440, y: 380 },
+      [e4.id]: { x: 60, y: 380 },
+      [e5.id]: { x: 250, y: 540 }
+    };
+    const demoRelations = [
+      { id: uid(), sourceId: e2.id, targetId: e3.id, cardinality: 'M:1' },
+      { id: uid(), sourceId: e4.id, targetId: e1.id, cardinality: 'M:1' },
+      { id: uid(), sourceId: e4.id, targetId: e5.id, cardinality: 'M:1' },
+      { id: uid(), sourceId: e3.id, targetId: e5.id, cardinality: 'M:1' }
+    ];
+    setEntities(demoEntities);
+    setPositions(demoPositions);
+    setRelations(demoRelations);
+    setShowLeft(true);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'b') { e.preventDefault(); setShowLeft(s => !s); } };
+    window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <div className="h-screen flex flex-col bg-[#0d1117]">
       <header className="bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 border-b border-[#21262d]/50">
@@ -791,7 +1316,7 @@ function App() {
           </div>
           <h1 className="text-lg font-bold text-[#c9d1d9]">Diagram Creator</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button onClick={addEntity}
             className="text-[12px] font-medium text-white bg-[#238636]/90 hover:bg-[#2ea043]/90 rounded-lg px-4 h-8 flex items-center gap-1.5 border border-[#3fb950]/30">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
@@ -810,19 +1335,69 @@ function App() {
             Relaciones{relations.length > 0 && <span className="ml-1 text-[10px] opacity-60">({relations.length})</span>}
           </button>
           <div className="w-px h-5 bg-[#30363d]/40 mx-0.5" />
-          <button onClick={fitToScreen} className="text-[#8b949e] bg-[#21262d]/80 rounded-lg w-8 h-8 flex items-center justify-center border border-[#30363d]/50" title="Ajustar">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          <input ref={fileInputRef} type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
+          <button onClick={() => fileInputRef.current?.click()}
+            className="text-[12px] font-medium text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 rounded-lg px-3 h-8 flex items-center border border-[#30363d]/50 transition-colors" title="Importar JSON">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1.5 shrink-0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Importar
           </button>
-          <div className="flex items-center bg-[#21262d]/80 rounded-lg border border-[#30363d]/50">
-            <button onClick={() => setZoom(z => Math.max(0.25, z - 0.1))} className="text-[#8b949e] w-8 h-8 flex items-center justify-center text-lg font-bold border-r border-[#30363d]/50">-</button>
-            <span className="text-[11px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
-            <button onClick={() => setZoom(z => Math.min(3, z + 0.1))} className="text-[#8b949e] w-8 h-8 flex items-center justify-center text-lg font-bold border-l border-[#30363d]/50">+</button>
-          </div>
+          {entities.length > 0 && <>
+            <div className="w-px h-5 bg-[#30363d]/40 mx-0.5" />
+            <div className="flex bg-[#21262d]/80 rounded-lg border border-[#30363d]/50">
+              <button data-export="png" onClick={handleExportPNG}
+                className="text-[12px] font-medium px-2.5 h-8 text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#30363d]/50 border-r border-[#30363d]/50 flex items-center gap-1.5 transition-colors rounded-l-lg" title="Exportar PNG">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                PNG
+              </button>
+              <button data-export="pdf" onClick={handleExportPDF}
+                className="text-[12px] font-medium px-2.5 h-8 text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#30363d]/50 flex items-center gap-1.5 transition-colors rounded-r-lg" title="Exportar PDF">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                PDF
+              </button>
+            </div>
+            <button onClick={() => setShowSortPanel(s => !s)}
+              className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center border gap-1.5 transition-colors ${showSortPanel ? 'text-[#3fb950] bg-[#3fb950]/15 border-[#3fb950]/30' : 'text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 border-[#30363d]/50'}`}
+              title="Panel de ordenamiento">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>
+                <polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/>
+                <line x1="4" y1="4" x2="9" y2="9"/>
+              </svg>
+              Ordenar
+            </button>
+            <div className="w-px h-5 bg-[#30363d]/40 mx-0.5" />
+            <button onClick={() => setShowLayers(s => !s)}
+              className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center border transition-colors ${showLayers || layers.length > 0 ? 'text-[#a371f7] bg-[#a371f7]/15 border-[#a371f7]/30' : 'text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 border-[#30363d]/50'}`}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mr-1.5 shrink-0">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span>Capas</span>
+              {layers.length > 0 && (
+                <span className="ml-1.5 flex items-center gap-1">
+                  <span className="flex -space-x-1">
+                    {layers.slice(0, 4).map(l => (
+                      <span key={l.id} className="w-2 h-2 rounded-full border border-[#0d1117]" style={{ backgroundColor: l.color }} />
+                    ))}
+                  </span>
+                  <span className="text-[10px] opacity-60">{layers.length}</span>
+                </span>
+              )}
+            </button>
+            <button onClick={() => setShowCategories(s => !s)}
+              className={`text-[12px] font-medium rounded-lg px-3 h-8 flex items-center border transition-colors ${showCategories || categories.length > 0 ? 'text-[#d29922] bg-[#d29922]/15 border-[#d29922]/30' : 'text-[#8b949e] hover:text-[#c9d1d9] bg-[#21262d]/80 hover:bg-[#30363d]/80 border-[#30363d]/50'}`}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mr-1.5 shrink-0">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Categorías</span>
+              {categories.length > 0 && <span className="ml-1.5 text-[10px] opacity-60">({categories.length})</span>}
+            </button>
+          </>}
+
         </div>
       </header>
 
       <div className="flex-1 flex overflow-hidden relative">
-        <div className="w-[320px] shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30 flex flex-col">
+        {showLeft && <div className="w-[450px] shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30 flex flex-col">
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-semibold text-[#c9d1d9] flex items-center gap-1.5">
@@ -842,15 +1417,15 @@ function App() {
                 <div key={e.id} onClick={() => setSelectedId(e.id)}
                   className={`rounded-lg border cursor-pointer transition-all ${selectedId === e.id ? 'border-[#58a6ff]/50 bg-[#1f6feb]/10' : 'border-[#30363d] bg-[#0d1117] hover:border-[#484f58]'}`}
                   style={{ borderLeft: `3px solid ${e.color}${selectedId === e.id ? 'cc' : '80'}` }}>
-                  <div className="flex items-center gap-2 px-3 py-2">
+                  <div className="flex items-center gap-3 px-4 py-3">
                     <input value={e.name} onChange={ev => updateEntityName(e.id, ev.target.value)}
                       onClick={ev => ev.stopPropagation()}
-                      className="flex-1 bg-transparent text-[12px] text-[#c9d1d9] font-medium focus:outline-none focus:text-white truncate" />
+                      className="flex-1 bg-transparent text-[14px] text-[#c9d1d9] font-semibold focus:outline-none focus:text-white truncate" />
                     <input type="color" value={e.color} onChange={ev => { ev.stopPropagation(); updateEntityColor(e.id, ev.target.value); }}
-                      onClick={ev => ev.stopPropagation()} className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0" />
-                    <span className="text-[10px] text-[#6e7681] font-mono">{e.columns.length} col.</span>
-                    <button onClick={ev => { ev.stopPropagation(); deleteEntity(e.id); }} className="text-[#6e7681] hover:text-[#f85149] p-0.5 rounded">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      onClick={ev => ev.stopPropagation()} className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent shrink-0" />
+                    <span className="text-[11px] text-[#6e7681] font-mono">{e.columns.length} col.</span>
+                    <button onClick={ev => { ev.stopPropagation(); deleteEntity(e.id); }} className="text-[#6e7681] hover:text-[#f85149] p-1 rounded">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                     </button>
                   </div>
                 </div>
@@ -868,7 +1443,7 @@ function App() {
                   <button onClick={() => addColumn(selEntity.id)}
                     className="text-[10px] font-medium text-[#58a6ff] bg-[#1f6feb]/15 hover:bg-[#1f6feb]/25 rounded px-2 py-1 border border-[#58a6ff]/25">+ Col</button>
                 </div>
-                <div className="max-h-[260px] overflow-y-auto rounded-lg border border-[#30363d]/50 bg-[#0d1117]/80">
+                <div className="max-h-[400px] overflow-y-auto rounded-lg border border-[#30363d]/50 bg-[#0d1117]/80">
                   {selEntity.columns.length === 0 ? (
                     <div className="px-3 py-4 text-center"><p className="text-[11px] text-[#6e7681] italic">Sin columnas</p></div>
                   ) : (
@@ -880,18 +1455,43 @@ function App() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
+
+        <button onClick={() => setShowLeft(!showLeft)}
+          className="absolute z-20 bg-[#21262d]/90 border border-[#30363d]/60 rounded-r-lg p-2 shadow-lg"
+          style={{ left: showLeft ? '450px' : '0', top: '3px' }}
+          title={showLeft ? 'Ocultar panel (Ctrl+B)' : 'Mostrar panel (Ctrl+B)'}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8b949e]">
+            <path d={showLeft ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+          </svg>
+        </button>
+        <button onClick={handleLoadDemo}
+          className="absolute z-20 bg-[#238636]/20 border border-[#3fb950]/30 rounded-r-lg p-2 shadow-lg hover:bg-[#238636]/30"
+          style={{ left: showLeft ? '450px' : '0', top: '57px' }}
+          title="Cargar ejemplo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#3fb950]">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="9" y1="13" x2="10" y2="14.5"/>
+            <line x1="15" y1="13" x2="14" y2="14.5"/>
+            <line x1="11" y1="17" x2="13" y2="17"/>
+          </svg>
+        </button>
 
         <div className="flex-1 relative">
           <Diagram entities={entities} relations={relations} positions={positions} zoom={zoom} pan={pan}
             activeRel={activeRel} setActiveRel={setActiveRel}
             relationMode={relationMode} relationSource={relationSource} onRelationClick={handleRelationClick}
-            onDragStart={(e, id) => {}}
             onDeleteEntity={deleteEntity} onAddColumn={addColumn}
             linePaths={linePaths} onUpdateLinePath={handleLinePathChange} onResetLinePath={handleResetLinePath}
             onSaveLinePathState={handleSaveLinePathState} onUndoLinePath={handleUndoLinePath}
             onPositionsChange={handlePositionChange} onSetZoom={setZoom} onSetPan={setPan}
-            selectedId={selectedId} onSetSelected={setSelectedId} />
+            selectedId={selectedId} onSetSelected={setSelectedId}
+            selectedEntities={selectedEntities} onSelectEntities={handleSelectEntities}
+            multiDragMode={multiDragMode} onToggleMultiDrag={() => setMultiDragMode(m => !m)}
+            layers={layers} onUpdateLayer={updateLayer} onRemoveLayer={removeLayer}
+            entityCategory={entityCategory} categories={categories}
+            fitKey={sortFitKey} />
 
           {activeRel && (() => {
             const rel = relations.find(r => r.id === activeRel);
@@ -899,19 +1499,14 @@ function App() {
             return <RelationConfig relation={rel} entities={entities} onUpdate={updateRelation} onDelete={deleteRelation} onClose={() => setActiveRel(null)} linePaths={linePaths} onResetLinePath={handleResetLinePath} onUndoLinePath={handleUndoLinePath} />;
           })()}
 
-          {entities.length > 0 && (
-            <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90 backdrop-blur-sm border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
-              <button onClick={() => { setRelationMode(r => !r); setActiveRel(null); }}
-                className={`rounded-lg w-9 h-9 flex items-center justify-center ${relationMode ? 'bg-[#1f6feb]/20 text-[#58a6ff]' : 'text-[#8b949e] bg-[#30363d]/50'}`} title="Modo relación">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-              </button>
-              <button onClick={fitToScreen} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center" title="Ajustar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-              </button>
-              <button onClick={() => setZoom(z => Math.max(0.25, z - 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">-</button>
-              <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
-              <button onClick={() => setZoom(z => Math.min(3, z + 0.1))} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">+</button>
-            </div>
+          {entities.length > 0 && showLayers && (
+            <LayerPanel layers={layers} onAddLayer={addLayer} onRemoveLayer={removeLayer} onUpdateLayer={updateLayer} onClose={() => setShowLayers(false)} />
+          )}
+          {entities.length > 0 && showCategories && (
+            <CategoryPanel categories={categories} entities={entities} entityCategory={entityCategory} onAddCategory={addCategory} onRemoveCategory={removeCategory} onUpdateCategory={updateCategory} onSetEntityCategory={setEntityCategoryId} onClose={() => setShowCategories(false)} />
+          )}
+          {entities.length > 0 && showSortPanel && (
+            <SortPanel entities={entities} categories={categories} entityCategory={entityCategory} onSort={handleSort} onClose={() => setShowSortPanel(false)} />
           )}
 
           {relationMode && !relationSource && (
@@ -949,7 +1544,7 @@ function App() {
                   relations.map(rel => {
                     const src = entities.find(e => e.id === rel.sourceId);
                     const tgt = entities.find(e => e.id === rel.targetId);
-                    const cardLabels = { '1:1': 'Uno a Uno', '1:M': 'Uno a Muchos', 'M:M': 'Muchos a Muchos' };
+                    const cardLabels = { '1:1': 'Uno a Uno', '1:M': 'Uno a Muchos', 'M:1': 'Muchos a Uno', 'M:M': 'Muchos a Muchos' };
                     return (
                       <div key={rel.id} onClick={() => setActiveRel(rel.id)}
                         className={`rounded-lg border cursor-pointer p-3 transition-all ${activeRel === rel.id ? 'border-[#58a6ff]/50 bg-[#1f6feb]/10' : 'border-[#30363d] bg-[#0d1117] hover:border-[#484f58]'}`}>
@@ -959,7 +1554,7 @@ function App() {
                           <span className="text-[12px] font-semibold text-[#c9d1d9] truncate">{tgt?.name || '?'}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px] font-mono font-bold text-[#58a6ff] bg-[#1f6feb]/15 rounded px-1.5 py-0.5">{rel.cardinality || '1:M'}</span>
+                          <span className="text-[10px] font-mono font-bold text-[#58a6ff] bg-[#1f6feb]/15 rounded px-1.5 py-0.5">{rel.cardinality || 'M:1'}</span>
                           <span className="text-[10px] text-[#6e7681] ml-1">{cardLabels[rel.cardinality] || ''}</span>
                         </div>
                       </div>
@@ -967,6 +1562,11 @@ function App() {
                   })
                 )}
               </div>
+            </div>
+          )}
+          {Object.keys(selectedEntities).length > 1 && (
+            <div className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-[#21262d]/95 border border-[#30363d]/50 rounded-lg px-4 py-2 shadow-lg z-20">
+              <p className="text-[12px] text-[#8b949e] text-center">{Object.keys(selectedEntities).length} entidades seleccionadas</p>
             </div>
           )}
         </div>
