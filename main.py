@@ -18,6 +18,14 @@ async def index():
 async def creador():
     return FileResponse("frontend/views/diagram-creator", media_type="text/html")
 
+@app.get("/demo")
+async def demo():
+    return FileResponse("frontend/views/demo-generator", media_type="text/html")
+
+@app.get("/")
+async def landing():
+    return FileResponse("index.html", media_type="text/html")
+
 @app.get("/login")
 async def login():
     return FileResponse("frontend/views/login.html", media_type="text/html")

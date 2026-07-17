@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo - Database Modeler</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; display: flex; flex-direction: column; overflow: hidden; }
+header { background: #161b22; border-bottom: 1px solid #21262d; padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+header svg { width: 20px; height: 20px; color: #58a6ff; }
+header h1 { font-size: 15px; font-weight: 700; }
+.container { flex: 1; display: flex; overflow: hidden; }
+.panel { width: 50%; overflow: hidden; display: flex; flex-direction: column; }
+.panel-left { border-right: 1px solid #21262d; }
+.panel-header { padding: 8px 14px; font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #21262d; background: #161b22; flex-shrink: 0; }
+.panel-body { flex: 1; overflow: auto; }
+.sql-code { padding: 16px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #c9d1d9; }
+.sql-kw { color: #ff7b72; }
+.sql-str { color: #a5d6ff; }
+.sql-num { color: #79c0ff; }
+.sql-comment { color: #8b949e; font-style: italic; }
+.diagram-wrap { flex: 1; overflow: hidden; position: relative; background: #0d1117; cursor: grab; }
+.diagram-wrap:active { cursor: grabbing; }
+.diagram-canvas { position: absolute; transform-origin: 0 0; }
+.diagram-canvas.dragging { transition: none; }
+.table-card {
+  position: absolute; width: 280px; border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(48,54,61,0.6); cursor: default;
+  background: linear-gradient(180deg, rgba(22,27,34,0.92), rgba(13,17,23,0.96));
+  backdrop-filter: blur(8px); box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  user-select: none;
+}
+.table-card.dragging { z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4); }
+.table-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px; border-bottom: 1px solid rgba(48,54,61,0.5); cursor: grab; }
+.table-header:active { cursor: grabbing; }
+.table-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.table-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
+.table-col { display: flex; align-items: center; gap: 8px; padding: 0 14px; height: 32px; border-bottom: 1px solid rgba(33,38,45,0.4); font-size: 12px; }
+.table-col:last-child { border-bottom: none; }
+.col-type { font-size: 9px; font-weight: 600; font-family: 'SF Mono', monospace; padding: 1px 6px; border-radius: 4px; }
+.col-name { flex: 1; }
+.col-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
+.badge-pk { color: #d29922; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.2); }
+.badge-fk { color: #a371f7; background: rgba(163,113,247,0.1); border: 1px solid rgba(163,113,247,0.2); }
+.badge-nn { color: #f85149; background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.2); }
+.badge-ai { color: #3fb950; background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.2); }
+.badge-uq { color: #58a6ff; background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.2); }
+.relation-line { display: flex; align-items: center; gap: 4px; padding: 5px 14px; font-size: 10px; color: #6e7681; font-family: 'SF Mono', monospace; background: rgba(13,17,23,0.5); border-top: 1px solid rgba(33,38,45,0.3); }
+.relation-line svg { width: 12px; height: 12px; color: #8b949e; flex-shrink: 0; }
+.zoom-controls { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 4px; background: rgba(33,38,45,0.9); border: 1px solid rgba(48,54,61,0.6); border-radius: 10px; padding: 4px 6px; z-index: 10; }
+.zoom-controls button { background: rgba(48,54,61,0.5); border: none; color: #8b949e; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
+.zoom-controls button:hover { background: rgba(48,54,61,0.8); color: #c9d1d9; }
+.zoom-controls span { font-size: 11px; color: #8b949e; width: 40px; text-align: center; font-family: 'SF Mono', monospace; }
+.footnote { position: fixed; bottom: 8px; right: 14px; font-size: 10px; color: #484f58; background: rgba(13,17,23,0.8); padding: 3px 10px; border-radius: 6px; border: 1px solid #21262d; z-index: 20; }
+.relation-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+</style>
+</head>
+<body>
+<header>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <ellipse cx="12" cy="5" rx="9" ry="3"/>
+    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+  </svg>
+  <h1>Diagram Generator — Demo</h1>
+</header>
+<div class="container">
+  <div class="panel panel-left">
+    <div class="panel-header">SQL de ejemplo</div>
+    <div class="panel-body sql-code" id="sqlDisplay"></div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">Diagrama generado <span style="font-weight:400;text-transform:none;color:#6e7681">— arrastra las tablas</span></div>
+    <div class="diagram-wrap" id="diagramWrap">
+      <div class="diagram-canvas" id="diagramCanvas">
+        <svg class="relation-svg" id="relationSvg"></svg>
+      </div>
+      <div class="zoom-controls">
+        <button id="zoomOut">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn">+</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="footnote">Arrastra las tablas para moverlas</div>
+<script>
+const sql = `CREATE TABLE clientes (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  nombre VARCHAR(100) NOT NULL,
+  email VARCHAR(255) UNIQUE,
+  telefono VARCHAR(20),
+  fecha_registro DATE,
+  activo BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE pedido (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  cliente_id INT NOT NULL,
+  fecha DATETIME,
+  total DECIMAL(10,2),
+  estado VARCHAR(20) DEFAULT 'pendiente',
+  FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+);`;
+
+function highlightSql(text) {
+  return text
+    .replace(/(--[^\n]*)/g, '<span class="sql-comment">$1</span>')
+    .replace(/\b(CREATE|TABLE|PRIMARY|KEY|AUTO_INCREMENT|NOT|NULL|UNIQUE|DEFAULT|TRUE|FALSE|FOREIGN|REFERENCES|INT|VARCHAR|DATE|DATETIME|DECIMAL|BOOLEAN)\b/g, '<span class="sql-kw">$1</span>')
+    .replace(/\((\d+(?:,\d+)?)\)/g, '<span class="sql-num">($1)</span>')
+    .replace(/'(?:[^'\\]|\\.)*'/g, '<span class="sql-str">$&</span>');
+}
+document.getElementById('sqlDisplay').innerHTML = highlightSql(sql);
+
+const tableData = [
+  {
+    name: 'clientes', color: '#6366f1',
+    cols: [
+      { name: 'id', type: 'INT', badges: ['PK', 'AI'] },
+      { name: 'nombre', type: 'VARCHAR', badges: ['NN'] },
+      { name: 'email', type: 'VARCHAR', badges: ['UQ'] },
+      { name: 'telefono', type: 'VARCHAR', badges: [] },
+      { name: 'fecha_registro', type: 'DATE', badges: [] },
+      { name: 'activo', type: 'BOOLEAN', badges: [] },
+    ]
+  },
+  {
+    name: 'pedido', color: '#22c55e',
+    cols: [
+      { name: 'id', type: 'INT', badges: ['PK', 'AI'] },
+      { name: 'cliente_id', type: 'INT', badges: ['NN', 'FK'] },
+      { name: 'fecha', type: 'DATETIME', badges: [] },
+      { name: 'total', type: 'DECIMAL', badges: [] },
+      { name: 'estado', type: 'VARCHAR', badges: [] },
+    ]
+  }
+];
+
+function buildCard(t, x, y) {
+  const div = document.createElement('div');
+  div.className = 'table-card';
+  div.style.left = x + 'px';
+  div.style.top = y + 'px';
+  div.dataset.table = t.name;
+  div.innerHTML =
+    `<div class="table-header" style="background:linear-gradient(180deg,${t.color}15,${t.color}03);border-bottom-color:${t.color}35">` +
+      `<div class="table-dot" style="background:${t.color};box-shadow:0 0 8px ${t.color}50"></div>` +
+      `<span class="table-name">${t.name}</span>` +
+    `</div>` +
+    `<div class="table-cols">` +
+      t.cols.map(c => {
+        const badges = c.badges.map(b => {
+          const cls = b === 'PK' ? 'badge-pk' : b === 'FK' ? 'badge-fk' : b === 'NN' ? 'badge-nn' : b === 'AI' ? 'badge-ai' : 'badge-uq';
+          return `<span class="col-badge ${cls}">${b}</span>`;
+        }).join('');
+        return `<div class="table-col">` +
+          `<span class="col-type" style="background:${t.color}08;border-color:${t.color}15;color:${t.color}">${c.type}</span>` +
+          `<span class="col-name">${c.name}</span>` +
+          `${badges}` +
+        `</div>`;
+      }).join('') +
+    `</div>` +
+    `<div class="relation-line">` +
+      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>` +
+      `FK: cliente_id → clientes(id)` +
+    `</div>`;
+  return div;
+}
+
+const canvas = document.getElementById('diagramCanvas');
+const wrap = document.getElementById('diagramWrap');
+const svg = document.getElementById('relationSvg');
+
+let zoom = 1;
+let panX = 0, panY = 0;
+let isPanning = false, panStart = {};
+
+const cards = [];
+const positions = [
+  { x: 60, y: 30 },
+  { x: 420, y: 100 }
+];
+
+tableData.forEach((t, i) => {
+  const card = buildCard(t, positions[i].x, positions[i].y);
+  canvas.appendChild(card);
+  cards.push(card);
+  makeDraggable(card, t);
+});
+
+function updateSvg() {
+  const c1 = cards[0], c2 = cards[1];
+  const r1 = c1.getBoundingClientRect(), r2 = c2.getBoundingClientRect();
+  const cr = canvas.getBoundingClientRect();
+  const x1 = r1.left - cr.left + r1.width / 2;
+  const y1 = r1.top - cr.top + r1.height;
+  const x2 = r2.left - cr.left + r2.width / 2;
+  const y2 = r2.top - cr.top;
+  svg.innerHTML =
+    `<defs><marker id="one" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="8" markerHeight="8" orient="auto"><line x1="1" y1="1" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/><line x1="1" y1="9" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/><line x1="1" y1="5" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/></marker></defs>` +
+    `<line x1="${x1}" y1="${y1}" x2="${x1}" y2="${(y1+y2)/2}" stroke="#484f58" stroke-width="2"/>` +
+    `<line x1="${x1}" y1="${(y1+y2)/2}" x2="${x2}" y2="${(y1+y2)/2}" stroke="#484f58" stroke-width="2"/>` +
+    `<line x1="${x2}" y1="${(y1+y2)/2}" x2="${x2}" y2="${y2}" stroke="#484f58" stroke-width="2" marker-end="url(#one)"/>` +
+    `<text x="${(x1+x2)/2}" y="${(y1+y2)/2 - 6}" text-anchor="middle" fill="#6e7681" font-size="10" font-family="SF Mono,monospace">1</text>` +
+    `<text x="${(x1+x2)/2}" y="${(y1+y2)/2 + 14}" text-anchor="middle" fill="#6e7681" font-size="10" font-family="SF Mono,monospace">N</text>`;
+}
+requestAnimationFrame(updateSvg);
+
+function makeDraggable(card) {
+  let drag = null;
+  const header = card.querySelector('.table-header');
+  header.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const scale = zoom;
+    drag = {
+      startX: e.clientX, startY: e.clientY,
+      origLeft: parseFloat(card.style.left),
+      origTop: parseFloat(card.style.top),
+      rect, scale
+    };
+    card.classList.add('dragging');
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  function onMove(e) {
+    if (!drag) return;
+    const dx = (e.clientX - drag.startX) / drag.scale;
+    const dy = (e.clientY - drag.startY) / drag.scale;
+    card.style.left = (drag.origLeft + dx) + 'px';
+    card.style.top = (drag.origTop + dy) + 'px';
+    updateSvg();
+  }
+  function onUp() {
+    drag = null;
+    card.classList.remove('dragging');
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+}
+
+(function setupPanZoom() {
+  wrap.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.table-card') || e.target.closest('.zoom-controls')) return;
+    isPanning = true;
+    panStart = { x: e.clientX - panX, y: e.clientY - panY };
+    wrap.style.cursor = 'grabbing';
+  });
+  document.addEventListener('mousemove', e => {
+    if (!isPanning) return;
+    panX = e.clientX - panStart.x;
+    panY = e.clientY - panStart.y;
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  });
+  document.addEventListener('mouseup', () => {
+    isPanning = false;
+    wrap.style.cursor = 'grab';
+  });
+  wrap.addEventListener('wheel', e => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    zoom = Math.max(0.25, Math.min(3, zoom + delta));
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+  }, { passive: false });
+  document.getElementById('zoomIn').addEventListener('click', () => {
+    zoom = Math.min(3, zoom + 0.1);
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+  });
+  document.getElementById('zoomOut').addEventListener('click', () => {
+    zoom = Math.max(0.25, zoom - 0.1);
+    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Database Design Engine — Modelador SQL a Diagrama ER Online</title>
+<meta name="description" content="Convierte SQL en diagramas entidad-relación interactivos. Editor visual de bases de datos online, gratuito y sin instalación. Exporta a PNG, PDF y SQL.">
+<meta name="keywords" content="diagrama ER, SQL a diagrama, modelado base de datos, diseñador BD online, creador diagramas entidad relación">
+<meta name="author" content="Database Design Engine">
+<meta property="og:title" content="Database Design Engine — Diseña esquemas de BD">
+<meta property="og:description" content="Convierte SQL en diagramas entidad-relación interactivos al instante. Visualiza, organiza y exporta tu modelo sin instalar nada.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0d1117">
+<style>
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #111827;
+  --bg-card: rgba(17,24,39,0.7);
+  --bg-card-hover: rgba(30,41,59,0.8);
+  --border: rgba(99,102,241,0.12);
+  --border-hover: rgba(99,102,241,0.3);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-1: #6366f1;
+  --accent-2: #8b5cf6;
+  --accent-3: #06b6d4;
+  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+  --accent-gradient-2: linear-gradient(135deg, #6366f1, #06b6d4);
+  --green: #10b981;
+  --orange: #f59e0b;
+  --pink: #ec4899;
+  --glass-bg: rgba(17,24,39,0.6);
+  --glass-border: rgba(99,102,241,0.08);
+  --radius: 12px;
+  --radius-lg: 20px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background:
+    radial-gradient(ellipse 100% 50% at 50% -5%, rgba(99,102,241,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 15%, rgba(6,182,212,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 30% at 20% 25%, rgba(167,139,250,0.03) 0%, transparent 50%),
+    radial-gradient(circle, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size: auto, auto, auto, 20px 20px;
+  background-color: #0a0e17;
+  color: var(--text-primary);
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+a { text-decoration: none; color: inherit; }
+
+/* ===== Floating Nav ===== */
+nav {
+  position: fixed; top: 1.25rem; left: 50%; transform: translateX(-50%);
+  z-index: 100; width: 92%; max-width: 960px;
+  background: rgba(10,14,23,0.75);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  border-radius: 100px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+}
+nav.scrolled {
+  top: 0.75rem;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+  background: rgba(10,14,23,0.85);
+}
+.nav-inner {
+  max-width: 100%; margin: 0 auto;
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 0 1.5rem 0 2rem; height: 64px;
+}
+.nav-brand { display: flex; align-items: center; gap: 0.65rem; font-weight: 700; font-size: 1.1rem; color: var(--text-primary); letter-spacing: -0.02em; }
+.nav-brand svg { width: 1.65rem; height: 1.65rem; color: var(--accent-1); filter: drop-shadow(0 0 10px rgba(99,102,241,0.3)); }
+.nav-links { display: flex; align-items: center; gap: 2rem; }
+.nav-links a { color: var(--text-muted); font-size: 0.9rem; font-weight: 500; transition: color 0.2s; position: relative; }
+.nav-links a::after { content: ''; position: absolute; bottom: -4px; left: 0; width: 0; height: 2px; background: var(--accent-gradient); border-radius: 2px; transition: width 0.3s; }
+.nav-links a:hover { color: var(--text-primary); }
+.nav-links a:hover::after { width: 100%; }
+.nav-cta {
+  background: var(--accent-gradient); color: #fff !important; padding: 0.55rem 1.4rem;
+  border-radius: 100px; font-weight: 600; font-size: 0.88rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 15px rgba(99,102,241,0.25);
+}
+.nav-cta::after { display: none !important; }
+.nav-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(99,102,241,0.35); }
+.nav-btn-secondary {
+  color: var(--text-secondary) !important; font-size: 0.88rem;
+  padding: 0.55rem 1.1rem; border-radius: 100px; font-weight: 500;
+  transition: all 0.2s;
+}
+.nav-btn-secondary:hover { color: var(--text-primary) !important; background: rgba(255,255,255,0.04); }
+
+/* ===== Sections Base ===== */
+section {
+  padding: 6rem 2rem; max-width: 1200px; margin: 0 auto; position: relative; z-index: 2;
+}
+section::after {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.03) 0%, transparent 60%);
+  pointer-events: none; z-index: -1;
+}
+
+/* ===== Section Separator ===== */
+.section-divider {
+  position: absolute; top: 0; left: 2rem; right: 2rem; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.2) 20%, rgba(6,182,212,0.15) 50%, rgba(99,102,241,0.2) 80%, transparent 100%);
+}
+
+/* ===== Section Header ===== */
+.section-header {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; margin-bottom: 3.5rem; position: relative;
+}
+.section-header--left { align-items: flex-start; text-align: left; }
+.section-title {
+  font-size: clamp(1.7rem, 3.5vw, 2.5rem); font-weight: 800;
+  letter-spacing: -0.03em; margin-bottom: 0.75rem; line-height: 1.2;
+  background: linear-gradient(135deg, #f1f5f9 0%, #a78bfa 50%, #06b6d4 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.section-title .highlight {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.section-desc {
+  color: var(--text-secondary); max-width: 580px; line-height: 1.7; font-size: 0.95rem;
+}
+
+/* ===== Hero ===== */
+#hero {
+  padding: 8rem 2rem 6rem; position: relative;
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+#hero::before {
+  content: ''; position: absolute; top: -30%; left: 50%; transform: translateX(-50%);
+  width: 1000px; height: 1000px;
+  background: radial-gradient(circle, rgba(99,102,241,0.08) 0%, rgba(6,182,212,0.04) 35%, transparent 70%);
+  pointer-events: none;
+}
+.hero-layout {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4rem; max-width: 1200px; width: 100%;
+  align-items: center; position: relative; z-index: 1;
+}
+.hero-text { text-align: left; }
+.hero-title {
+  font-size: clamp(2.5rem, 5.5vw, 4.5rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1;
+  background: linear-gradient(135deg, #f1f5f9 0%, #a78bfa 50%, #06b6d4 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 1rem; position: relative;
+}
+.hero-title .hero-underline {
+  display: inline-block; position: relative;
+}
+.hero-title .hero-underline::after {
+  content: ''; position: absolute; bottom: 4px; left: 0; right: 0; height: 5px;
+  background: var(--accent-gradient); border-radius: 4px; opacity: 0.45;
+}
+.hero-sub {
+  font-size: clamp(0.95rem, 1.5vw, 1.15rem); color: #94a3b8;
+  max-width: 520px; margin-bottom: 2.5rem; line-height: 1.8;
+  font-weight: 400;
+}
+.hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+.hero-visual { display: flex; justify-content: center; }
+.hero-card {
+  width: 100%; max-width: 600px; border-radius: 16px;
+  background: rgba(15,18,30,0.6); border: 1px solid rgba(99,102,241,0.12);
+  overflow: hidden; backdrop-filter: blur(2px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.hero-card-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 12px 16px; background: rgba(10,14,23,0.4);
+  border-bottom: 1px solid rgba(99,102,241,0.08);
+}
+.hero-card-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.hero-card-label {
+  margin-left: auto; font-size: 0.7rem; color: var(--text-muted);
+  font-family: monospace; opacity: 0.6;
+}
+.hero-card-body {
+  padding: 0;
+}
+.hero-card-img {
+  display: block; width: 100%; height: auto;
+  aspect-ratio: 4/3; object-fit: cover;
+}
+
+.btn-primary {
+  background: var(--accent-gradient); border: none; color: #fff;
+  padding: 0.9rem 2.4rem; border-radius: 100px; font-weight: 600; font-size: 1rem;
+  cursor: pointer; transition: all 0.25s; display: inline-flex; align-items: center; gap: 0.6rem;
+  box-shadow: 0 4px 25px rgba(99,102,241,0.3);
+  letter-spacing: -0.01em;
+}
+.btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 40px rgba(99,102,241,0.45); }
+
+.btn-secondary {
+  background: var(--glass-bg); border: 1px solid var(--border);
+  color: var(--text-primary); padding: 0.8rem 1.8rem; border-radius: 100px;
+  font-weight: 500; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; display: inline-block;
+}
+.btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--accent-1); }
+
+/* ===== Features ===== */
+#features { text-align: center; }
+.features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.25rem; margin-top: 3rem;
+}
+.feature-card {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); padding: 2rem; text-align: left;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative; overflow: hidden;
+}
+.feature-card::before {
+  content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px;
+  background: var(--accent-gradient); opacity: 0; transition: opacity 0.35s;
+}
+.feature-card:hover { border-color: var(--border-hover); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+.feature-card:hover::before { opacity: 1; }
+.feature-icon {
+  width: 3rem; height: 3rem; border-radius: 14px;
+  background: rgba(99,102,241,0.08);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1.25rem; color: var(--accent-1);
+  border: 1px solid rgba(99,102,241,0.08);
+}
+.feature-icon svg { width: 1.4rem; height: 1.4rem; }
+.feature-card h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+.feature-card p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.6; }
+
+/* ===== Demo ===== */
+#demo { background: transparent; }
+.demo-frame-wrap {
+  margin-top: 2rem; border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 60px rgba(0,0,0,0.4);
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+.demo-frame-wrap::before {
+  content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg);
+  padding: 1px; background: var(--accent-gradient);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none; opacity: 0.3;
+}
+.demo-frame-wrap iframe { width: 100%; height: 640px; border: 0; display: block; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
+@media (max-width: 800px) { .demo-frame-wrap iframe { height: 480px; } }
+
+/* ===== How it Works ===== */
+#how { text-align: center; }
+.steps {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem; margin-top: 3rem; text-align: center;
+}
+.step {
+  background: var(--glass-bg); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg); padding: 2rem 1.5rem 2.5rem;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+}
+.step::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--accent-gradient); opacity: 0;
+  transition: opacity 0.35s;
+}
+.step:hover { border-color: var(--border-hover); transform: translateY(-6px); box-shadow: 0 16px 48px rgba(0,0,0,0.35); }
+.step:hover::before { opacity: 1; }
+.step-num {
+  width: 3.75rem; height: 3.75rem; border-radius: 50%;
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(6,182,212,0.08));
+  border: 1px solid rgba(99,102,241,0.15);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1.25rem;
+  color: var(--accent-1); flex-shrink: 0;
+  transition: all 0.35s;
+}
+.step-num svg { width: 1.5rem; height: 1.5rem; }
+.step:hover .step-num { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(6,182,212,0.12)); border-color: var(--accent-1); transform: scale(1.05); }
+.step h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.02em; }
+.step p { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.7; max-width: 300px; }
+
+
+
+/* ===== Footer ===== */
+footer {
+  border-top: 1px solid var(--glass-border); padding: 1.25rem 2rem;
+  background: rgba(10,14,23,0.5); position: relative; z-index: 2;
+}
+.footer-inner { max-width: 1200px; margin: 0 auto; display: flex; align-items: center; justify-content: center; gap: 1rem; flex-wrap: wrap; }
+footer p { color: var(--text-muted); font-size: 0.8rem; }
+
+/* ===== Nav mobile ===== */
+.nav-toggle { display: none; flex-direction: column; gap: 5px; cursor: pointer; padding: 4px; background: none; border: none; }
+.nav-toggle span { display: block; width: 22px; height: 2px; background: var(--text-primary); border-radius: 2px; transition: all 0.3s; }
+.nav-toggle.active span:nth-child(1) { transform: rotate(45deg) translate(5px, 5px); }
+.nav-toggle.active span:nth-child(2) { opacity: 0; }
+.nav-toggle.active span:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
+
+@media (max-width: 700px) {
+  nav { top: 0.75rem; max-width: 95%; border-radius: 60px; }
+  .nav-toggle { display: flex; }
+  .nav-links {
+    position: fixed; top: 66px; left: 2.5%; right: 2.5%; width: 95%;
+    background: rgba(10,14,23,0.97);
+    flex-direction: column; padding: 1.25rem 1.5rem; gap: 1rem;
+    border: 1px solid var(--glass-border); border-radius: 20px;
+    display: none;
+  }
+  .nav-links.open { display: flex; }
+  .nav-links a { font-size: 0.95rem; }
+  .nav-links a::after { display: none; }
+  .nav-cta, .nav-btn-secondary { display: block; text-align: center; }
+  section { padding: 4rem 1.25rem; }
+  #hero { min-height: auto; padding-top: 7rem; }
+  .hero-layout { gap: 2.5rem; }
+}
+
+/* ===== Iframe loading skeleton ===== */
+.demo-frame-wrap .loading-skeleton { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); z-index: 1; }
+.demo-frame-wrap .loading-skeleton.hide { display: none; }
+.spinner { width: 36px; height: 36px; border: 3px solid rgba(99,102,241,0.15); border-top-color: var(--accent-1); border-radius: 50%; }
+
+/* ===== Back to top ===== */
+#back-to-top { position: fixed; bottom: 2rem; right: 2rem; width: 44px; height: 44px; border-radius: 50%; background: var(--glass-bg); border: 1px solid var(--border); color: var(--text-primary); display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 99; display: none; }
+#back-to-top.visible { display: flex; }
+#back-to-top:hover { background: var(--bg-card-hover); border-color: var(--accent-1); }
+#back-to-top svg { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="nav-brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <ellipse cx="12" cy="5" rx="9" ry="3"/>
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+      </svg>
+      DB Modeler
+    </a>
+    <button class="nav-toggle" aria-label="Abrir menú de navegación">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="nav-links" role="navigation" aria-label="Menú principal">
+      <a href="#features">Features</a>
+      <a href="#demo">Demo</a>
+      <a href="#how">Cómo funciona</a>
+      <a href="/login" class="nav-btn-secondary">Iniciar sesión</a>
+      <a href="/register" class="nav-cta">Registrarse</a>
+    </div>
+  </div>
+</nav>
+
+<section id="hero">
+  <div class="hero-layout">
+    <div class="hero-text">
+      <h1 class="hero-title">
+        Diseña el esquema<br>
+        de tu <span class="hero-underline">base de datos</span>
+      </h1>
+      <p class="hero-sub">Convierte SQL en diagramas entidad-relación interactivos al instante. Visualiza, organiza y exporta tu modelo sin instalar nada.</p>
+      <div class="hero-actions">
+        <a href="/generador" class="btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          Probar generador SQL
+        </a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card">
+        <div class="hero-card-header">
+          <span class="hero-card-dot" style="background:#ef4444;"></span>
+          <span class="hero-card-dot" style="background:#f59e0b;"></span>
+          <span class="hero-card-dot" style="background:#10b981;"></span>
+          <span class="hero-card-label">diagrama.sql</span>
+        </div>
+        <div class="hero-card-body">
+          <img src="assets/images/fondo.jpg" alt="Database Diagram Preview" class="hero-card-img">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="section-divider"></div>
+  <div class="section-header">
+    <h2 class="section-title">Características</h2>
+    <p class="section-desc">Una herramienta completa que transforma SQL en diagramas visuales con edición interactiva y múltiples formatos de exportación.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/><rect x="2" y="7" width="20" height="13" rx="2"/></svg></div>
+      <h3>SQL a Diagrama</h3>
+      <p>Pega tu SQL de CREATE TABLE y genera automáticamente un diagrama entidad-relación con tablas, columnas, PKs, FKs y cardinalidades.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="color:#8b5cf6;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+      <h3>Editor Visual</h3>
+      <p>Crea tus tablas manualmente, arrastra para posicionarlas, conéctalas visualmente y configura cardinalidades con un clic.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="color:#06b6d4;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+      <h3>Exportar PNG / PDF</h3>
+      <p>Exporta tu diagrama como imagen PNG o documento PDF con un solo clic. Ideal para documentación técnica y presentaciones.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="color:#10b981;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+      <h3>Generar SQL</h3>
+      <p>Desde tu diagrama visual, genera el SQL equivalente para MySQL o PostgreSQL. Perfecto para desarrollo y migraciones.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="color:#f59e0b;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></div>
+      <h3>Auto Layout</h3>
+      <p>Organiza automáticamente las tablas usando algoritmos de grafo. Ordena por nombre, color, categoría o relaciones.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="color:#ec4899;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg></div>
+      <h3>Capas y Categorías</h3>
+      <p>Agrupa tablas en capas de colores, asigna categorías personalizadas y mantén tu diagrama organizado y profesional.</p>
+    </div>
+  </div>
+</section>
+
+<section id="demo">
+  <div class="section-divider"></div>
+  <div class="section-header">
+    <h2 class="section-title">Demo interactiva</h2>
+    <p class="section-desc">Generador SQL a diagrama completo. Escribe SQL y obtén el modelo visual al instante.</p>
+  </div>
+  <div class="demo-frame-wrap">
+    <div class="loading-skeleton" id="demo-loading"><div class="spinner"></div></div>
+    <iframe src="/demo" title="Generador SQL a Diagrama" loading="lazy" onload="document.getElementById('demo-loading').classList.add('hide')"></iframe>
+  </div>
+  <div style="text-align:center;margin-top:1.5rem;" >
+    <a href="/generador" class="btn-primary">Probar versión completa</a>
+  </div>
+</section>
+
+<section id="how">
+  <div class="section-divider"></div>
+  <div class="section-header">
+    <h2 class="section-title">Cómo funciona</h2>
+    <p class="section-desc">Desde tu SQL hasta un diagrama profesional en segundos. Tres pasos simples.</p>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </div>
+      <h3>Pega tu SQL</h3>
+      <p>Ingresa tus sentencias CREATE TABLE con claves primarias, foráneas y constraints. Soporta sintaxis MySQL, PostgreSQL y SQLite.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/><circle cx="7" cy="7" r="1"/><circle cx="7" cy="17" r="1"/><circle cx="17" cy="7" r="1"/><circle cx="17" cy="17" r="1"/></svg>
+      </div>
+      <h3>Genera el diagrama</h3>
+      <p>El motor parsea tu SQL y construye automáticamente el modelo entidad-relación con tablas, columnas, PKs, FKs y cardinalidades.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <h3>Exporta o edita</h3>
+      <p>Descarga como PNG/PDF, genera SQL de salida, o sigue editando visualmente con arrastrar y soltar.</p>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+<button id="back-to-top" aria-label="Volver arriba">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+</button>
+
+<footer>
+  <div class="footer-inner">
+    <p>&copy; 2026 DB Modeler &mdash; Open source bajo MIT</p>
+  </div>
+</footer>
+
+<script>
+(function() {
+  var nav = document.querySelector('nav');
+  var toggle = document.querySelector('.nav-toggle');
+  var navLinks = document.querySelector('.nav-links');
+  var backToTop = document.getElementById('back-to-top');
+
+  if (toggle && navLinks) {
+    toggle.addEventListener('click', function() {
+      this.classList.toggle('active');
+      navLinks.classList.toggle('open');
+      this.setAttribute('aria-label', navLinks.classList.contains('open') ? 'Cerrar menú' : 'Abrir menú');
+    });
+    document.querySelectorAll('.nav-links a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        toggle.classList.remove('active');
+        navLinks.classList.remove('open');
+        toggle.setAttribute('aria-label', 'Abrir menú de navegación');
+      });
+    });
+  }
+
+  window.addEventListener('scroll', function() {
+    nav.classList.toggle('scrolled', window.scrollY > 10);
+    if (backToTop) backToTop.classList.toggle('visible', window.scrollY > 400);
+  }, { passive: true });
+
+  if (backToTop) {
+    backToTop.addEventListener('click', function() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
