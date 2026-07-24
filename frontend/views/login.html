@@ -69,9 +69,10 @@ a { text-decoration: none; color: inherit; }
   background: url('/assets/images/hero-bg.webp') center/cover no-repeat;
   position: relative;
   overflow: hidden;
-  padding: 4rem;
+  padding: 2.5rem 4rem 2rem;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 2rem;
+  justify-content: center;
 }
 
 .left-panel::before {
@@ -93,111 +94,55 @@ a { text-decoration: none; color: inherit; }
 .brand {
   position: relative;
   z-index: 1;
-}
-
-.brand-icon {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 3rem;
-  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
-.brand-icon svg {
-  width: 2.5rem;
-  height: 2.5rem;
-  color: var(--accent-1);
-  filter: drop-shadow(0 0 12px rgba(88,166,255,0.3));
-}
-
-.brand-icon span {
+.brand-title {
   color: #ffffff;
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  text-shadow: 0 1px 12px rgba(0,0,0,0.5);
-}
-
-.brand-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: rgba(88,166,255,0.1);
-  border: 1px solid rgba(88,166,255,0.2);
-  border-radius: 6px;
-  padding: 0.25rem 0.7rem 0.25rem 0.35rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--accent-1);
-  margin-bottom: 1.5rem;
-  letter-spacing: 0.02em;
-  opacity: 0;
-  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.4);
-}
-
-.brand-badge-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--green);
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
-
-.brand h1 {
-  color: #ffffff;
-  font-size: 2.75rem;
+  font-size: 2.65rem;
   font-weight: 800;
   line-height: 1.2;
   letter-spacing: -0.03em;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   opacity: 0;
-  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  animation-delay: 0.2s;
+  animation: titleReveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.15s;
   text-shadow: 0 2px 20px rgba(0,0,0,0.6);
+}
+@keyframes titleReveal {
+  0% { opacity: 0; transform: translateY(24px) scale(0.95); filter: blur(6px); }
+  60% { filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.brand-highlight {
+  background: linear-gradient(135deg, #58a6ff 0%, #a371f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  position: relative;
+  display: inline-block;
+  animation: highlightGlow 3s ease-in-out infinite;
+}
+@keyframes highlightGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.25); }
 }
 
 .brand p {
   color: #e6edf3;
-  font-size: 1.05rem;
-  line-height: 1.7;
+  font-size: 1rem;
+  line-height: 1.6;
   max-width: 36rem;
+  margin-bottom: 0.1rem;
   opacity: 0;
   animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: 0.5s;
   text-shadow: 0 1px 12px rgba(0,0,0,0.5);
 }
 
-.brand-features {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  opacity: 0;
-  animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  animation-delay: 0.7s;
-}
 
-.brand-features li {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: #e6edf3;
-  font-size: 0.9rem;
-  list-style: none;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.5);
-}
-
-.brand-features li svg {
-  width: 1.1rem;
-  height: 1.1rem;
-  color: var(--accent-1);
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 6px rgba(88,166,255,0.3));
-}
 
 @keyframes textReveal {
   0% { opacity: 0; transform: translateY(18px); }
@@ -213,6 +158,7 @@ a { text-decoration: none; color: inherit; }
   position: relative;
   z-index: 1;
   text-align: center;
+  padding-top: 0.5rem;
   opacity: 0;
   animation: textReveal 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   animation-delay: 1.6s;
@@ -244,84 +190,203 @@ a { text-decoration: none; color: inherit; }
   height: 1.25rem;
 }
 
-/* ===== Hero Card (from landing page) ===== */
-.hero-visual {
+/* ===== Features Grid ===== */
+.features-section {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+  margin-top: 0.1rem;
+  gap: 0.1rem;
+  overflow: hidden;
+  opacity: 0;
+  animation: featuresEntrance 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.9s;
+}
+@keyframes featuresEntrance {
+  0% { opacity: 0; transform: translateY(24px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.features-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 0.25rem;
+  text-shadow: 0 1px 12px rgba(0,0,0,0.5);
+}
+.features-section h2::after {
+  content: '';
   flex: 1;
+  height: 1px;
+  max-width: 120px;
+  background: linear-gradient(90deg, rgba(88,166,255,0.4) 0%, transparent 100%);
+}
+.features-section > p {
+  color: rgba(230,237,243,0.75);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  margin-bottom: 0.75rem;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+  padding-left: 0.75rem;
+  border-left: 2px solid rgba(88,166,255,0.2);
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(48,54,61,0.5) transparent;
+}
+.features-grid::-webkit-scrollbar { width: 4px; }
+.features-grid::-webkit-scrollbar-track { background: transparent; }
+.features-grid::-webkit-scrollbar-thumb { background: rgba(48,54,61,0.5); border-radius: 4px; }
+.fc-card {
+  background: linear-gradient(145deg, rgba(26,31,46,0.7) 0%, rgba(22,27,34,0.8) 100%);
+  border: 1px solid rgba(48,54,61,0.4);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  opacity: 0;
+  animation: cardFadeIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.fc-card:nth-child(1) { animation-delay: 0.05s; }
+.fc-card:nth-child(2) { animation-delay: 0.1s; }
+.fc-card:nth-child(3) { animation-delay: 0.15s; }
+.fc-card:nth-child(4) { animation-delay: 0.2s; }
+.fc-card:nth-child(5) { animation-delay: 0.25s; }
+.fc-card:nth-child(6) { animation-delay: 0.3s; }
+@keyframes cardFadeIn {
+  0% { opacity: 0; transform: translateY(10px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fc-card:hover {
+  border-color: rgba(88,166,255,0.25);
+  background: linear-gradient(145deg, rgba(26,31,46,0.9) 0%, rgba(22,27,34,0.95) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4), 0 0 20px rgba(88,166,255,0.05);
+}
+.fc-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.25rem;
+}
+.fc-card-header svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+.fc-card-header h3 {
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.fc-card p {
+  color: rgba(139,148,158,0.85);
+  font-size: 0.68rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.demo-cta {
+  position: relative;
+  z-index: 1;
+  margin-top: 0.25rem;
+  padding: 0.9rem 1.1rem 1rem;
+  background: rgba(22,27,34,0.92);
+  border: 1px solid rgba(88,166,255,0.2);
+  border-radius: 10px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  opacity: 0;
+  animation: demoFadeIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.6s;
+  text-align: center;
+}
+.demo-cta::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgba(88,166,255,0.2), rgba(163,113,247,0.1), transparent);
+  z-index: -1;
+  opacity: 0.5;
+}
+@keyframes demoFadeIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.demo-cta h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  margin-top: 1.5rem;
-  min-height: 0;
-  opacity: 0;
-  animation: diagramReveal 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  animation-delay: 0.9s;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.7);
 }
-.hero-card {
-  width: 100%; max-width: 520px; border-radius: 8px;
-  background: #161b22;
-  border: 1px solid #30363d;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  position: relative;
-  overflow: hidden;
-}
-.hero-card-inner {
-  border-radius: 8px; overflow: hidden;
-}
-.hero-card-header {
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px; background: #0d1117;
-  border-bottom: 1px solid #30363d;
-}
-.hero-card-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  transition: transform 0.2s;
-}
-.hero-card-dot:hover { transform: scale(1.3); }
-.hero-card-label {
-  margin-left: auto; font-size: 0.75rem; color: var(--text-muted);
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  letter-spacing: 0.02em;
-}
-.hero-card-body {
-  position: relative; overflow: hidden;
-}
-.hero-card-body::after {
+.demo-cta h3::before {
   content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(13,17,23,0.4) 0%, transparent 30%);
-  pointer-events: none; z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3fb950;
+  box-shadow: 0 0 10px rgba(63,185,80,0.5);
+  animation: pulseDot 2s ease-in-out infinite;
 }
-.hero-card-img {
-  display: block; width: 100%; height: auto;
-  aspect-ratio: 4/3; object-fit: cover;
-  transition: transform 0.4s ease;
-  transform: scale(0.95);
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
 }
-.hero-card:hover .hero-card-img {
-  transform: scale(1.02);
+.demo-cta p {
+  color: #e6edf3;
+  font-size: 0.74rem;
+  line-height: 1.6;
+  margin-bottom: 0.85rem;
+  padding-left: 0;
+  text-shadow: 0 1px 10px rgba(0,0,0,0.6);
 }
-.hero-float-code {
-  position: absolute; bottom: -16px; right: -24px;
-  background: #161b22;
-  border: 1px solid #30363d;
+.demo-cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(180deg, #2ea043 0%, #238636 100%);
+  border: 1px solid rgba(46,160,67,0.4);
   border-radius: 8px;
-  padding: 0.65rem 0.85rem;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.6rem;
-  color: var(--text-muted);
-  line-height: 1.5;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  z-index: 2;
-  animation: float-code 5s ease-in-out infinite;
-  pointer-events: none;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 2px 0 rgba(13,17,23,0.6), 0 4px 12px rgba(46,160,67,0.15);
+  text-decoration: none;
+  font-family: inherit;
+  margin-left: 0;
 }
-.hero-float-code .sql-kw { color: #ff7b72; }
-.hero-float-code .sql-type { color: #79c0ff; }
-.hero-float-code .sql-name { color: #a5d6ff; }
-@keyframes float-code {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-6px); }
+.demo-cta-btn:hover {
+  background: linear-gradient(180deg, #3fb950 0%, #2ea043 100%);
+  border-color: rgba(46,160,67,0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 rgba(13,17,23,0.6), 0 8px 24px rgba(46,160,67,0.2);
+}
+.demo-cta-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 rgba(13,17,23,0.6);
+}
+.demo-cta-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 
 /* ===== Right Panel ===== */
@@ -637,48 +702,72 @@ a { text-decoration: none; color: inherit; }
 
 <div class="left-panel">
   <div class="brand">
-    <div class="brand-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <ellipse cx="12" cy="5" rx="9" ry="3"/>
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-      </svg>
-      <span>Database Modeler</span>
-    </div>
-    <div class="brand-badge">
-      <span class="brand-badge-dot"></span>
-      Modelador SQL a Diagrama ER
-    </div>
-    <h1>Diseña el esquema<br>de tu base de datos</h1>
+
+    <h1 class="brand-title">Diseña el <span class="brand-highlight">esquema</span><br>de tu <span class="brand-highlight">base de datos</span></h1>
     <p>Convierte SQL en diagramas entidad-relación al instante. Visualiza, organiza y exporta tu modelo sin instalar nada.</p>
-    <ul class="brand-features">
-      <li>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        SQL a diagrama automático
-      </li>
-      <li>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        Exporta a PNG, PDF y SQL
-      </li>
-      <li>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        Editor visual con arrastrar y soltar
-      </li>
-      <li>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-        Open source y gratuito
-      </li>
-    </ul>
+
   </div>
 
+  <div class="features-section">
+      <h2>Características</h2>
+      <p>Una herramienta completa que transforma SQL en diagramas visuales con edición interactiva y múltiples formatos de exportación.</p>
+      <div class="features-grid">
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#58a6ff;"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/><rect x="2" y="7" width="20" height="13" rx="2"/></svg>
+            <h3>SQL a Diagrama</h3>
+          </div>
+          <p>Pega tu SQL y genera al instante el diagrama ER con tablas, columnas, PKs, FKs y cardinalidades.</p>
+        </div>
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#a371f7;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <h3>Exportar PNG / PDF</h3>
+          </div>
+          <p>Exporta tu diagrama como PNG o PDF con un clic. Ideal para documentación y presentaciones.</p>
+        </div>
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#3fb950;"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <h3>Generar SQL</h3>
+          </div>
+          <p>Desde el diagrama visual genera el SQL equivalente para MySQL o PostgreSQL.</p>
+        </div>
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#d29922;"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="3"/></svg>
+            <h3>Auto Layout</h3>
+          </div>
+          <p>Organiza tablas automáticamente con algoritmos de grafo. Ordena por nombre, color o relaciones.</p>
+        </div>
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#f85149;"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="22 8.5 12 15.5 2 8.5"/></svg>
+            <h3>Capas y Categorías</h3>
+          </div>
+          <p>Agrupa tablas en capas de colores con categorías personalizadas.</p>
+        </div>
+        <div class="fc-card">
+          <div class="fc-card-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#79c0ff;"><path d="M12 5v14"/><path d="M5 12h14"/><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/></svg>
+            <h3>Editor Visual</h3>
+          </div>
+          <p>Edita con arrastrar y soltar. Añade tablas, conecta relaciones y personaliza cada elemento.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="demo-cta">
+      <h3>¿Aún no lo pruebas?</h3>
+      <p>Genera tu primer diagrama entidad-relación sin registrarte. Pega tu SQL, explora el editor visual y exporta tu modelo al instante. Todo gratis, sin compromiso.</p>
+      <a href="/#demo" class="demo-cta-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Probar demo online
+      </a>
+    </div>
 
   <div class="left-footer">
-    <a href="https://github.com" target="_blank" class="github-icon">
-      <svg fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-      </svg>
-      Open source on GitHub
-    </a>
+
     <p>&copy; 2026 Database Modeler</p>
   </div>
 </div>
