@@ -24,7 +24,7 @@
     .diagram-container .table-card { cursor: default; }
     .diagram-pattern {
       background-color: #0d1117;
-      background-image: url('/images/fondo.jpg');
+      background-image: url('/images/fondo.webp');
       background-size: cover;
       background-position: center;
       background-blend-mode: overlay;

@@ -33,6 +33,26 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+
+::-webkit-scrollbar { width: 16px; }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #58a6ff, #a371f7);
+  border-radius: 8px;
+  border: 3px solid #0d1117;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #79b8ff, #b392f0);
+}
+::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #58a6ff, #a371f7);
+}
+* { scrollbar-width: auto; scrollbar-color: #58a6ff transparent; }
+html::-webkit-scrollbar-thumb { transition: opacity 0.25s ease; }
+html.scroll-active::-webkit-scrollbar-thumb { opacity: 1; }
+html:not(.scroll-active)::-webkit-scrollbar-thumb { opacity: 0; }
 body {
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   background-color: #0d1117;
@@ -229,7 +249,7 @@ section:nth-child(even)::after {
 #hero {
   padding: 8rem 2rem 6rem; position: relative;
   min-height: 100vh; display: flex; align-items: center; justify-content: center;
-  background: url('assets/images/hero-bg.jpg') center/cover no-repeat;
+  background: url('assets/images/hero-bg.webp') center/cover no-repeat;
   max-width: none;
 }
 
@@ -960,7 +980,7 @@ footer::after {
             <span class="hero-card-label">diagrama.sql</span>
           </div>
           <div class="hero-card-body">
-            <img src="assets/images/diagrama.png" alt="Database Diagram Preview" class="hero-card-img">
+            <img src="assets/images/diagrama.webp" alt="Database Diagram Preview" class="hero-card-img">
           </div>
         </div>
       </div>
@@ -1141,8 +1161,16 @@ footer::after {
     }
   }
 
+  var scrollTimeout;
+  document.documentElement.classList.remove('scroll-active');
+
   window.addEventListener('scroll', function() {
     nav.classList.toggle('scrolled', window.scrollY > 10);
+    document.documentElement.classList.add('scroll-active');
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(function() {
+      document.documentElement.classList.remove('scroll-active');
+    }, 2000);
   }, { passive: true });
 
   var sections = document.querySelectorAll('section[id]');
