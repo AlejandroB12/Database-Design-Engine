@@ -15,7 +15,7 @@ a { text-decoration: none; }
 
 .left-panel {
   display: none;
-  width: 55%;
+  width: 60%;
   background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
   position: relative;
   overflow: hidden;
@@ -170,7 +170,7 @@ a { text-decoration: none; }
 
 @media (min-width: 900px) {
   .right-panel {
-    width: 45%;
+    width: 40%;
   }
 }
 
