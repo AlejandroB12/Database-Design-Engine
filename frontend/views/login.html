@@ -413,91 +413,156 @@ a { text-decoration: none; color: inherit; }
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(48,54,61,0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(48,54,61,0.08) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 70%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 70%);
+    linear-gradient(rgba(48,54,61,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(48,54,61,0.06) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black 20%, transparent 70%);
   pointer-events: none;
+}
+
+.bg-grid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(88,166,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(163,113,247,0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black 10%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 50% at 50% 50%, black 10%, transparent 70%);
+  animation: gridPulse 6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes gridPulse {
+  0% { opacity: 0.3; }
+  100% { opacity: 1; }
 }
 
 .bg-glow {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(88,166,255,0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 500px 500px at 80% 80%, rgba(163,113,247,0.05) 0%, transparent 60%),
-    radial-gradient(ellipse 400px 300px at 60% 10%, rgba(63,185,80,0.03) 0%, transparent 50%);
+    radial-gradient(ellipse 700px 500px at 20% 30%, rgba(88,166,255,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 600px at 80% 70%, rgba(163,113,247,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 400px at 50% 10%, rgba(63,185,80,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 400px 400px at 70% 20%, rgba(248,81,73,0.05) 0%, transparent 50%);
   pointer-events: none;
-  animation: ambientGlow 8s ease-in-out infinite alternate;
+  animation: ambientGlow 10s ease-in-out infinite alternate;
+}
+
+.bg-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 500px 500px at 50% 50%, rgba(88,166,255,0.03) 0%, transparent 60%);
+  animation: glowPulse 4s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes glowPulse {
+  0% { opacity: 0.3; transform: scale(0.95); }
+  100% { opacity: 0.7; transform: scale(1.05); }
 }
 
 .glass-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(13,17,23,0.35);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(13,17,23,0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, black 25%, transparent 72%);
   -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, black 25%, transparent 72%);
   pointer-events: none;
 }
 
 @keyframes ambientGlow {
-  0% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.05); }
-  100% { opacity: 0.6; transform: scale(1); }
+  0% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.03); }
+  100% { opacity: 0.5; transform: scale(1); }
 }
 
 .floating-orb {
   position: absolute;
   border-radius: 50%;
   pointer-events: none;
-  filter: blur(60px);
-  opacity: 0.15;
+  filter: blur(40px);
+  opacity: 0.5;
 }
 
 .floating-orb:nth-child(1) {
-  width: 300px;
-  height: 300px;
-  background: radial-gradient(circle, rgba(88,166,255,0.3) 0%, transparent 70%);
-  top: -80px;
-  right: -60px;
-  animation: orbFloat1 12s ease-in-out infinite;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(88,166,255,0.7) 0%, transparent 70%);
+  top: -120px;
+  right: -100px;
+  animation: orbFloat1 15s ease-in-out infinite;
 }
 
 .floating-orb:nth-child(2) {
-  width: 200px;
-  height: 200px;
-  background: radial-gradient(circle, rgba(163,113,247,0.25) 0%, transparent 70%);
-  bottom: 40px;
-  left: -40px;
-  animation: orbFloat2 10s ease-in-out infinite;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(163,113,247,0.65) 0%, transparent 70%);
+  bottom: -80px;
+  left: -100px;
+  animation: orbFloat2 13s ease-in-out infinite;
 }
 
 .floating-orb:nth-child(3) {
-  width: 150px;
-  height: 150px;
-  background: radial-gradient(circle, rgba(63,185,80,0.15) 0%, transparent 70%);
-  top: 50%;
-  right: 10%;
-  animation: orbFloat3 14s ease-in-out infinite;
+  width: 240px;
+  height: 240px;
+  background: radial-gradient(circle, rgba(63,185,80,0.5) 0%, transparent 70%);
+  top: 35%;
+  right: -40px;
+  animation: orbFloat3 18s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(4) {
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(248,81,73,0.45) 0%, transparent 70%);
+  top: 10%;
+  left: -40px;
+  animation: orbFloat4 12s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(5) {
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, rgba(210,153,34,0.4) 0%, transparent 70%);
+  bottom: 30%;
+  right: 20%;
+  animation: orbFloat5 16s ease-in-out infinite;
 }
 
 @keyframes orbFloat1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, 40px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
+  25% { transform: translate(-40px, 30px) scale(1.1); }
+  50% { transform: translate(20px, -40px) scale(0.9); }
+  75% { transform: translate(-30px, -20px) scale(1.05); }
 }
 
 @keyframes orbFloat2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(40px, -30px) scale(1.15); }
+  33% { transform: translate(50px, -40px) scale(1.15); }
+  66% { transform: translate(-30px, 30px) scale(0.9); }
 }
 
 @keyframes orbFloat3 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(-30px, -20px) scale(1.1); }
+  50% { transform: translate(-40px, -30px) scale(1.1); }
+}
+
+@keyframes orbFloat4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(30px, 40px) scale(1.15); }
+}
+
+@keyframes orbFloat5 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-20px, -30px) scale(0.9); }
 }
 
 @media (min-width: 900px) {
@@ -902,6 +967,8 @@ a { text-decoration: none; color: inherit; }
   <div class="bg-grid"></div>
   <div class="bg-glow"></div>
   <div class="glass-overlay"></div>
+  <div class="floating-orb"></div>
+  <div class="floating-orb"></div>
   <div class="floating-orb"></div>
   <div class="floating-orb"></div>
   <div class="floating-orb"></div>
