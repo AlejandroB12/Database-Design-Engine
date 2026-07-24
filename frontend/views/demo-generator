@@ -3,91 +3,770 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Demo - Database Modeler</title>
+<title>Demo - Diagram Generator</title>
+<script src="lib/tailwind.js"></script>
+<script src="lib/react.production.min.js"></script>
+<script src="lib/react-dom.production.min.js"></script>
+<script src="lib/babel.min.js"></script>
+<script src="lib/pdf-lib.min.js"></script>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; }
-body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #0d1117; color: #c9d1d9; display: flex; flex-direction: column; overflow: hidden; }
-header { background: #161b22; border-bottom: 1px solid #21262d; padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-header svg { width: 20px; height: 20px; color: #58a6ff; }
-header h1 { font-size: 15px; font-weight: 700; }
-.container { flex: 1; display: flex; overflow: hidden; }
-.panel { width: 50%; overflow: hidden; display: flex; flex-direction: column; }
-.panel-left { border-right: 1px solid #21262d; }
-.panel-header { padding: 8px 14px; font-size: 11px; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #21262d; background: #161b22; flex-shrink: 0; }
-.panel-body { flex: 1; overflow: auto; }
-.sql-code { padding: 16px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; color: #c9d1d9; }
-.sql-kw { color: #ff7b72; }
-.sql-str { color: #a5d6ff; }
-.sql-num { color: #79c0ff; }
-.sql-comment { color: #8b949e; font-style: italic; }
-.diagram-wrap { flex: 1; overflow: hidden; position: relative; background: #0d1117; cursor: grab; }
-.diagram-wrap:active { cursor: grabbing; }
-.diagram-canvas { position: absolute; transform-origin: 0 0; }
-.diagram-canvas.dragging { transition: none; }
-.table-card {
-  position: absolute; width: 280px; border-radius: 10px; overflow: hidden;
-  border: 1px solid rgba(48,54,61,0.6); cursor: default;
-  background: linear-gradient(180deg, rgba(22,27,34,0.92), rgba(13,17,23,0.96));
-  backdrop-filter: blur(8px); box-shadow: 0 8px 30px rgba(0,0,0,0.4);
-  user-select: none;
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #161b22; }
+::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+.diagram-container { cursor: grab; }
+.diagram-container.panning { cursor: grabbing; }
+.diagram-container .table-card { cursor: default; }
+.diagram-pattern {
+  background-color: #0d1117;
+  background-image: url('/images/fondo.webp');
+  background-size: cover;
+  background-position: center;
+  background-blend-mode: overlay;
 }
-.table-card.dragging { z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4); }
-.table-header { display: flex; align-items: center; gap: 8px; padding: 10px 14px 8px; border-bottom: 1px solid rgba(48,54,61,0.5); cursor: grab; }
-.table-header:active { cursor: grabbing; }
-.table-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-.table-name { font-size: 14px; font-weight: 600; color: #e6edf3; }
-.table-col { display: flex; align-items: center; gap: 8px; padding: 0 14px; height: 32px; border-bottom: 1px solid rgba(33,38,45,0.4); font-size: 12px; }
-.table-col:last-child { border-bottom: none; }
-.col-type { font-size: 9px; font-weight: 600; font-family: 'SF Mono', monospace; padding: 1px 6px; border-radius: 4px; }
-.col-name { flex: 1; }
-.col-badge { font-size: 9px; font-weight: 700; padding: 1px 6px; border-radius: 10px; }
-.badge-pk { color: #d29922; background: rgba(210,153,34,0.1); border: 1px solid rgba(210,153,34,0.2); }
-.badge-fk { color: #a371f7; background: rgba(163,113,247,0.1); border: 1px solid rgba(163,113,247,0.2); }
-.badge-nn { color: #f85149; background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.2); }
-.badge-ai { color: #3fb950; background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.2); }
-.badge-uq { color: #58a6ff; background: rgba(88,166,255,0.1); border: 1px solid rgba(88,166,255,0.2); }
-.relation-line { display: flex; align-items: center; gap: 4px; padding: 5px 14px; font-size: 10px; color: #6e7681; font-family: 'SF Mono', monospace; background: rgba(13,17,23,0.5); border-top: 1px solid rgba(33,38,45,0.3); }
-.relation-line svg { width: 12px; height: 12px; color: #8b949e; flex-shrink: 0; }
-.zoom-controls { position: absolute; bottom: 16px; right: 16px; display: flex; align-items: center; gap: 4px; background: rgba(33,38,45,0.9); border: 1px solid rgba(48,54,61,0.6); border-radius: 10px; padding: 4px 6px; z-index: 10; }
-.zoom-controls button { background: rgba(48,54,61,0.5); border: none; color: #8b949e; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all 0.12s; }
-.zoom-controls button:hover { background: rgba(48,54,61,0.8); color: #c9d1d9; }
-.zoom-controls span { font-size: 11px; color: #8b949e; width: 40px; text-align: center; font-family: 'SF Mono', monospace; }
-.footnote { position: fixed; bottom: 8px; right: 14px; font-size: 10px; color: #484f58; background: rgba(13,17,23,0.8); padding: 3px 10px; border-radius: 6px; border: 1px solid #21262d; z-index: 20; }
-.relation-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.table-card.dragging { z-index: 100; box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08) !important; transform: translateY(-2px); will-change: transform; }
+.table-card { will-change: transform; }
+.diagram-svg { pointer-events: none; }
+.diagram-canvas { transform-origin: 0 0; }
+.diagram-svg line { cursor: pointer; }
+.sql-keyword { color: #ff7b72; }
+.sql-string { color: #a5d6ff; }
+.sql-number { color: #79c0ff; }
+.sql-comment { color: #8b949e; font-style: italic; }
+.sql-backtick { color: #79c0ff; }
+.sql-operator { color: #ff7b72; }
+button {
+  position: relative;
+  box-shadow: 0 2px 0 rgba(13,17,23,0.6), 0 4px 8px rgba(0,0,0,0.3);
+  transition: all 0.12s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+button:hover:not(:disabled) {
+  box-shadow: 0 3px 0 rgba(13,17,23,0.6), 0 6px 14px rgba(0,0,0,0.45);
+  transform: translateY(-1px);
+}
+button:active:not(:disabled) {
+  box-shadow: 0 1px 0 rgba(13,17,23,0.6), 0 2px 4px rgba(0,0,0,0.25);
+  transform: translateY(1px);
+}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+@keyframes col-pulse {
+  0%, 100% { background-color: rgba(88, 166, 255, 0.06); border-left-color: rgba(88, 166, 255, 0.2); }
+  25% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
+  50% { background-color: rgba(88, 166, 255, 0.2); border-left-color: rgba(88, 166, 255, 0.6); }
+  75% { background-color: rgba(88, 166, 255, 0.3); border-left-color: rgba(88, 166, 255, 0.9); }
+}
+.col-pulse { animation: col-pulse 1.2s ease-in-out 2; }
 </style>
 </head>
-<body>
-<header>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-    <ellipse cx="12" cy="5" rx="9" ry="3"/>
-    <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
-    <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
-  </svg>
-  <h1>Diagram Generator — Demo</h1>
-</header>
-<div class="container">
-  <div class="panel panel-left">
-    <div class="panel-header">SQL de ejemplo</div>
-    <div class="panel-body sql-code" id="sqlDisplay"></div>
-  </div>
-  <div class="panel">
-    <div class="panel-header">Diagrama generado <span style="font-weight:400;text-transform:none;color:#6e7681">— arrastra las tablas</span></div>
-    <div class="diagram-wrap" id="diagramWrap">
-      <div class="diagram-canvas" id="diagramCanvas">
-        <svg class="relation-svg" id="relationSvg"></svg>
-      </div>
-      <div class="zoom-controls">
-        <button id="zoomOut">−</button>
-        <span id="zoomLabel">100%</span>
-        <button id="zoomIn">+</button>
+<body class="bg-[#0d1117] text-[#c9d1d9]">
+<div id="root"></div>
+<script src="routes/utils.js"></script>
+<script src="routes/parser.js"></script>
+<script src="routes/layout.js"></script>
+<script src="routes/export.js"></script>
+<script type="text/babel">
+const { useState, useCallback, useMemo, useRef, useEffect } = React;
+
+function midpoint(p1, p2) { return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }; }
+
+function closestOnRect(px, py, rx, ry, rw, rh) {
+  const left = rx, right = rx + rw, top = ry, bottom = ry + rh;
+  const cx = Math.max(left, Math.min(right, px));
+  const cy = Math.max(top, Math.min(bottom, py));
+  if (cx === px && cy === py) {
+    const dl = px - left, dr = right - px, dt = py - top, db = bottom - py;
+    const min = Math.min(dl, dr, dt, db);
+    if (min === dl) return { x: left, y: cy };
+    if (min === dr) return { x: right, y: cy };
+    if (min === dt) return { x: cx, y: top };
+    return { x: cx, y: bottom };
+  }
+  if (px < left) { if (py < top) return { x: left, y: top }; if (py > bottom) return { x: left, y: bottom }; return { x: left, y: py }; }
+  if (px > right) { if (py < top) return { x: right, y: top }; if (py > bottom) return { x: right, y: bottom }; return { x: right, y: py }; }
+  if (py < top) return { x: px, y: top };
+  return { x: px, y: bottom };
+}
+
+function snapEndpoints(points, lineKey, tables, positions, dims) {
+  if (points.length < 2) return points;
+  const d1 = lineKey.indexOf('-'); if (d1 === -1) return points;
+  const srcId = lineKey.substring(0, d1);
+  const rest = lineKey.substring(d1 + 1); const d2 = rest.indexOf('-'); if (d2 === -1) return points;
+  const refTbl = rest.substring(d2 + 1);
+  const np = points.map(p => ({...p}));
+  const srcT = tables.find(t => t.id === srcId);
+  if (srcT && dims[srcId] && positions[srcId]) {
+    const p = positions[srcId], d = dims[srcId];
+    const ref = np.length >= 2 ? np[1] : np[0];
+    const sn = closestOnRect(ref.x, ref.y, p.x, p.y, d.w, d.h);
+    np[0] = sn;
+    if (np.length >= 2) {
+      if (Math.abs(sn.x - np[1].x) < Math.abs(sn.y - np[1].y)) np[1].x = sn.x; else np[1].y = sn.y;
+    }
+  }
+  const tgtT = tables.find(t => t.name === refTbl);
+  if (tgtT && dims[tgtT.id] && positions[tgtT.id]) {
+    const p = positions[tgtT.id], d = dims[tgtT.id];
+    const li = np.length - 1;
+    const ref = np.length >= 2 ? np[li - 1] : np[li];
+    const sn = closestOnRect(ref.x, ref.y, p.x, p.y, d.w, d.h);
+    np[li] = sn;
+    if (np.length >= 2) {
+      if (Math.abs(sn.x - np[li - 1].x) < Math.abs(sn.y - np[li - 1].y)) np[li - 1].x = sn.x; else np[li - 1].y = sn.y;
+    }
+  }
+  return np;
+}
+
+function pathLength(points) {
+  let len = 0;
+  for (let i = 0; i < points.length - 1; i++) len += Math.abs(points[i].x - points[i+1].x) + Math.abs(points[i].y - points[i+1].y);
+  return len;
+}
+
+function pathCrossesRect(points, rect) {
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i], p2 = points[i+1];
+    if (p1.x === p2.x) {
+      const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
+      if (p1.x >= rect.x && p1.x <= rect.x + rect.w && maxY >= rect.y && minY <= rect.y + rect.h) return true;
+    } else {
+      const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
+      if (p1.y >= rect.y && p1.y <= rect.y + rect.h && maxX >= rect.x && minX <= rect.x + rect.w) return true;
+    }
+  }
+  return false;
+}
+
+function findRoute(srcRect, srcColIdx, tgtRect, tgtColIdx, obstacles) {
+  const colH = 34, headerH = 40;
+  const getColY = (rect, idx) => rect.y + headerH + (idx >= 0 ? idx * colH + colH / 2 : colH / 2);
+  const sCy = getColY(srcRect, srcColIdx);
+  const tCy = getColY(tgtRect, tgtColIdx);
+  const sCx = srcRect.x + srcRect.w / 2;
+  const tCx = tgtRect.x + tgtRect.w / 2;
+  const padObs = obstacles.map(o => ({ x: o.x - 8, y: o.y - 8, w: o.w + 16, h: o.h + 16 }));
+  const candidates = [];
+  candidates.push({ points: [{ x: srcRect.x + srcRect.w, y: sCy }, { x: (srcRect.x + srcRect.w + tgtRect.x) / 2, y: sCy }, { x: (srcRect.x + srcRect.w + tgtRect.x) / 2, y: tCy }, { x: tgtRect.x, y: tCy }]});
+  candidates.push({ points: [{ x: srcRect.x, y: sCy }, { x: (srcRect.x + tgtRect.x + tgtRect.w) / 2, y: sCy }, { x: (srcRect.x + tgtRect.x + tgtRect.w) / 2, y: tCy }, { x: tgtRect.x + tgtRect.w, y: tCy }]});
+  candidates.push({ points: [{ x: sCx, y: srcRect.y + srcRect.h }, { x: sCx, y: (srcRect.y + srcRect.h + tgtRect.y) / 2 }, { x: tCx, y: (srcRect.y + srcRect.h + tgtRect.y) / 2 }, { x: tCx, y: tgtRect.y }]});
+  candidates.push({ points: [{ x: sCx, y: srcRect.y }, { x: sCx, y: (srcRect.y + tgtRect.y + tgtRect.h) / 2 }, { x: tCx, y: (srcRect.y + tgtRect.y + tgtRect.h) / 2 }, { x: tCx, y: tgtRect.y + tgtRect.h }]});
+  if (obstacles.length > 0) {
+    const aboveY = Math.min(srcRect.y, tgtRect.y, ...obstacles.map(o => o.y)) - 50;
+    const belowY = Math.max(srcRect.y + srcRect.h, tgtRect.y + tgtRect.h, ...obstacles.map(o => o.y + o.h)) + 50;
+    const rightX = Math.max(srcRect.x + srcRect.w, tgtRect.x + tgtRect.w, ...obstacles.map(o => o.x + o.w)) + 50;
+    const leftX = Math.min(srcRect.x, tgtRect.x, ...obstacles.map(o => o.x)) - 50;
+    candidates.push({ points: [{ x: sCx, y: srcRect.y }, { x: sCx, y: aboveY }, { x: tCx, y: aboveY }, { x: tCx, y: tgtRect.y }]});
+    candidates.push({ points: [{ x: sCx, y: srcRect.y + srcRect.h }, { x: sCx, y: belowY }, { x: tCx, y: belowY }, { x: tCx, y: tgtRect.y + tgtRect.h }]});
+    candidates.push({ points: [{ x: srcRect.x + srcRect.w, y: sCy }, { x: rightX, y: sCy }, { x: rightX, y: tCy }, { x: tgtRect.x, y: tCy }]});
+    candidates.push({ points: [{ x: srcRect.x, y: sCy }, { x: leftX, y: sCy }, { x: leftX, y: tCy }, { x: tgtRect.x + tgtRect.w, y: tCy }]});
+  }
+  let best = null, bestScore = Infinity;
+  for (const c of candidates) {
+    let score = 0;
+    for (const obs of padObs) { if (pathCrossesRect(c.points, obs)) score += 1000; }
+    score += pathLength(c.points);
+    if (score < bestScore) { bestScore = score; best = c.points; }
+  }
+  return best;
+}
+
+function pointsToAngularPath(points) {
+  if (points.length < 2) return '';
+  let d = `M ${points[0].x},${points[0].y}`;
+  for (let i = 1; i < points.length; i++) d += ` L ${points[i].x},${points[i].y}`;
+  return d;
+}
+
+function ColumnBadgeInner({ col, tableId, tableName, activeFk, hoveredFk, fkInfo, pulseFk }) {
+  const typeColor = { INT:'#6366f1', BIGINT:'#6366f1', SMALLINT:'#6366f1', TINYINT:'#6366f1', VARCHAR:'#22c55e', CHAR:'#22c55e', TEXT:'#22c55e', MEDIUMTEXT:'#22c55e', LONGTEXT:'#22c55e', BOOLEAN:'#f59e0b', DATE:'#06b6d4', DATETIME:'#06b6d4', TIMESTAMP:'#06b6d4', FLOAT:'#ec4899', DOUBLE:'#ec4899', DECIMAL:'#ec4899', BLOB:'#8b5cf6', ENUM:'#f97316', UUID:'#14b8a6', JSON:'#84cc16' };
+  const constraintMeta = col.pk ? { color: '#d29922', label: 'PK' } : col.uq ? { color: '#58a6ff', label: 'UQ' } : { color: null, label: '' };
+  const highlightKey = activeFk || hoveredFk;
+  const isHighlight = highlightKey && (
+    (fkInfo[highlightKey]?.tableId === tableId && fkInfo[highlightKey]?.column === col.name) ||
+    (fkInfo[highlightKey]?.refTable === tableName && fkInfo[highlightKey]?.refColumn === col.name)
+  );
+  const isPulsing = pulseFk && (
+    (fkInfo[pulseFk]?.tableId === tableId && fkInfo[pulseFk]?.column === col.name) ||
+    (fkInfo[pulseFk]?.refTable === tableName && fkInfo[pulseFk]?.refColumn === col.name)
+  );
+  const pulseCls = isPulsing && !highlightKey ? 'col-pulse' : '';
+  const tc = typeColor[col.type] || '#8b949e';
+  return (
+    <div data-col-badge="true" className={`flex items-center gap-2.5 px-3 border-b border-[rgba(33,38,45,0.4)] last:border-b-0 transition-all duration-150 ${isHighlight ? 'bg-[#1f6feb]/12' : pulseCls || 'hover:bg-[rgba(28,35,51,0.45)] hover:border-l-[#58a6ff]/40'}`}
+      style={{ height: 34, borderLeft: '2px solid transparent' }}>
+      <span className="text-[10px] font-mono font-semibold px-2 rounded-md leading-none tracking-tight"
+        style={{
+          color: isHighlight ? '#ffffff' : tc,
+          background: isHighlight ? 'rgba(255,255,255,0.2)' : `${tc}12`,
+          border: `1px solid ${isHighlight ? 'rgba(255,255,255,0.3)' : `${tc}25`}`,
+          boxShadow: isHighlight ? '0 0 8px rgba(255,255,255,0.1)' : 'none'
+        }}>{col.type}</span>
+      <span className={`text-[13px] font-medium flex-1 truncate ${isHighlight ? 'text-white' : 'text-[#c9d1d9]'}`}>{col.name}</span>
+      <div className="flex items-center gap-1 shrink-0">
+        {constraintMeta.label && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{ color: constraintMeta.color, background: `${constraintMeta.color}18`, border: `1px solid ${constraintMeta.color}35` }}>{constraintMeta.label}</span>
+        )}
+        {col.fk && !col.pk && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{ color: '#a371f7', background: '#a371f718', border: '1px solid #a371f735' }}>FK</span>
+        )}
+        {col.nn && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{ color: '#f85149', background: '#f8514918', border: '1px solid #f8514935' }}>NN</span>
+        )}
+        {col.ai && (
+          <span className="text-[9px] font-bold px-1.5 py-[1.5px] rounded-full leading-none"
+            style={{ color: '#3fb950', background: '#3fb95018', border: '1px solid #3fb95035' }}>AI</span>
+        )}
       </div>
     </div>
-  </div>
-</div>
-<div class="footnote">Arrastra las tablas para moverlas</div>
-<script>
-const sql = `CREATE TABLE clientes (
+  );
+}
+
+const ColumnBadge = React.memo(ColumnBadgeInner);
+
+const TableNodeInner = ({ table, position, selected, onSelect, onDragStart, activeFk, hoveredFk, fkInfo, pulseFk }, ref) => {
+  const c = table.color || '#6366f1';
+  return (
+    <div ref={ref}
+      className={`table-card absolute rounded-lg overflow-hidden w-[310px]`}
+      style={{
+        left: position.x, top: position.y,
+        background: 'linear-gradient(180deg, rgba(22,27,34,0.88) 0%, rgba(13,17,23,0.94) 100%)',
+        border: '1px solid',
+        borderColor: selected ? c + '99' : 'rgba(48,54,61,0.6)',
+        borderLeftWidth: '3px',
+        borderLeftColor: c + (selected ? 'cc' : '80'),
+        boxShadow: selected
+          ? `0 0 0 1px ${c}60, 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)`
+          : '0 8px 30px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)',
+        borderBottom: selected ? `2px solid ${c}80` : `2px solid ${c}30`
+      }}
+    >
+      <div className="flex items-center justify-between px-3.5 py-2.5 cursor-grab active:cursor-grabbing select-none"
+        style={{ background: `linear-gradient(180deg, ${c}25, ${c}05)`, borderBottom: `1px solid ${c}35` }}
+        onMouseDown={(e) => onDragStart(e, table.id)}
+      >
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-[10px] h-[10px] rounded-sm shrink-0" style={{ backgroundColor: c, boxShadow: `0 0 8px ${c}50` }} />
+          <h3 className="text-sm font-semibold text-[#e6edf3] truncate">{table.name}</h3>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[11px] text-[#6e7681] font-medium">{table.columns.length} col.</span>
+        </div>
+      </div>
+      <div>
+        {table.columns.map(col => <ColumnBadge key={col.id} col={col} tableId={table.id} tableName={table.name} activeFk={activeFk} hoveredFk={hoveredFk} fkInfo={fkInfo} pulseFk={pulseFk} />)}
+      </div>
+    </div>
+  );
+};
+const TableNode = React.memo(React.forwardRef(TableNodeInner), (prev, next) => {
+  return prev.table.id === next.table.id
+    && prev.position.x === next.position.x
+    && prev.position.y === next.position.y
+    && prev.selected === next.selected
+    && prev.activeFk === next.activeFk
+    && prev.hoveredFk === next.hoveredFk
+    && prev.pulseFk === next.pulseFk;
+});
+
+function Diagram({ tables, selectedTables, onSelectTable, onPositionsChange, positions, zoom, linePaths, onUpdateLinePath, onResetLinePath, fitKey }) {
+  const containerRef = useRef(null);
+  const canvasRef = useRef(null);
+  const dragRef = useRef(null);
+  const tableRefs = useRef({});
+  const [activeFk, setActiveFk] = useState(null);
+  const [hoveredFk, setHoveredFk] = useState(null);
+  const [pulseFk, setPulseFk] = useState(null);
+  const [tableDims, setTableDims] = useState({});
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panDragRef = useRef(null);
+  const selectedTablesRef = useRef(selectedTables);
+  selectedTablesRef.current = selectedTables;
+  const waypointDragRef = useRef(null);
+  const pulseTimeoutRef = useRef(null);
+  const tablesRef = useRef(tables);
+  tablesRef.current = tables;
+  const positionsRef = useRef(positions);
+  positionsRef.current = positions;
+  const tableDimsRef = useRef(tableDims);
+  tableDimsRef.current = tableDims;
+  const rafRef = useRef(null);
+  const pendingMouseEvent = useRef(null);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+
+  const prevTableCount = useRef(0);
+  const prevFitKey = useRef(0);
+  const tableByIdRef = useRef({});
+  const tableByNameRef = useRef({});
+  const columnIdxRef = useRef({});
+  const routeCacheRef = useRef({});
+
+  const fitToScreen = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const vals = Object.values(positions).filter(Boolean);
+    if (vals.length === 0) return;
+    const minX = Math.min(...vals.map(p => p.x)), minY = Math.min(...vals.map(p => p.y));
+    const maxX = Math.max(...vals.map(p => p.x + 310)), maxY = Math.max(...vals.map(p => {
+      const t = tableByIdRef.current[Object.keys(positions).find(k => positions[k] === p)];
+      return p.y + (t ? tableHeight(t) : 300);
+    }));
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const pad = 40;
+    const scale = Math.min((cw - pad) / (maxX - minX + 280), (ch - pad) / (maxY - minY + 200), 1.5);
+    const clamped = Math.max(0.25, Math.min(3, scale));
+    onPositionsChange(null, null, { abs: clamped });
+    setPan({ x: (cw - (maxX - minX) * clamped) / 2 - minX * clamped, y: (ch - (maxY - minY) * clamped) / 2 - minY * clamped });
+  }, [positions, onPositionsChange]);
+
+  useEffect(() => {
+    const isFirst = prevTableCount.current === 0 && tables.length > 0;
+    const fitKeyChanged = prevFitKey.current !== fitKey;
+    prevTableCount.current = tables.length;
+    prevFitKey.current = fitKey;
+    if (isFirst || fitKeyChanged) {
+      Promise.resolve().then(fitToScreen);
+    }
+  }, [tables, fitToScreen, fitKey]);
+
+  const fkInfo = useMemo(() => {
+    const map = {};
+    for (const t of tables) for (const ref of (t.refs || [])) map[`${t.id}-${ref.column}-${ref.refTable}`] = { tableId: t.id, column: ref.column, refTable: ref.refTable, refColumn: ref.refColumn, cardinality: ref.cardinality || 'M:1' };
+    return map;
+  }, [tables]);
+
+  useMemo(() => {
+    const byId = {}; const byName = {};
+    for (const t of tables) { byId[t.id] = t; byName[t.name] = t; }
+    tableByIdRef.current = byId;
+    tableByNameRef.current = byName;
+    const colIdx = {}; for (const t of tables) { const m = {}; t.columns.forEach((c, i) => { m[c.name] = i; }); colIdx[t.id] = m; }
+    columnIdxRef.current = colIdx;
+  }, [tables]);
+
+  useEffect(() => {
+    const dims = {};
+    for (const t of tables) { const el = tableRefs.current[t.id]; if (el) { const r = el.getBoundingClientRect(); dims[t.id] = { w: r.width / zoom, h: r.height / zoom }; } }
+    setTableDims(dims);
+  }, [tables, zoom]);
+
+  const svgLines = useMemo(() => {
+    const lines = []; const rects = {};
+    for (const t of tables) { const pos = positions[t.id]; const dim = tableDims[t.id]; if (pos && dim) rects[t.id] = { x: pos.x, y: pos.y, w: dim.w, h: dim.h }; }
+    const tableByName = {}; for (const t of tables) tableByName[t.name] = t;
+    const colIdx = {}; for (const t of tables) { const m = {}; t.columns.forEach((c, i) => { m[c.name] = i; }); colIdx[t.id] = m; }
+    const tableSet = new Set(tables.map(t => t.id));
+    for (const t of tables) {
+      for (const ref of (t.refs || [])) {
+        const lineKey = `${t.id}-${ref.column}-${ref.refTable}`;
+        const srcRect = rects[t.id]; const tgtTable = tableByName[ref.refTable]; const tgtRect = tgtTable ? rects[tgtTable.id] : null;
+        if (!srcRect || !tgtRect) continue;
+        const srcColIdx = colIdx[t.id][ref.column];
+        const tgtColIdx = colIdx[tgtTable.id][ref.refColumn];
+        let points;
+        if (linePaths && linePaths[lineKey]) {
+          points = linePaths[lineKey];
+        } else {
+          const cacheKey = `${lineKey}_${srcRect.x},${srcRect.y},${srcRect.w},${srcRect.h}_${tgtRect.x},${tgtRect.y},${tgtRect.w},${tgtRect.h}`;
+          const cached = routeCacheRef.current[cacheKey];
+          if (cached) {
+            points = cached;
+          } else {
+            const obstacles = [];
+            for (const id of tableSet) {
+              if (id !== t.id && id !== tgtTable.id) { const r = rects[id]; if (r) obstacles.push(r); }
+            }
+            points = findRoute(srcRect, srcColIdx >= 0 ? srcColIdx : 0, tgtRect, tgtColIdx >= 0 ? tgtColIdx : 0, obstacles);
+            routeCacheRef.current[cacheKey] = points;
+            if (Object.keys(routeCacheRef.current) > 200) routeCacheRef.current = {};
+          }
+        }
+        if (points) {
+          const card = ref.cardinality || 'M:1';
+          const startPos = points.length >= 2 ? midpoint(points[0], points[1]) : points[0];
+          const endPos = points.length >= 2 ? midpoint(points[points.length - 2], points[points.length - 1]) : points[points.length - 1];
+          let startLabel, endLabel, startMarker, endMarker;
+          switch (card) {
+            case '1:1': startLabel = '1'; endLabel = '1'; startMarker = 'one'; endMarker = 'one'; break;
+            case '1:M': startLabel = 'N'; endLabel = '1'; startMarker = 'many'; endMarker = 'one'; break;
+            case 'M:1': startLabel = 'N'; endLabel = '1'; startMarker = 'many'; endMarker = 'one'; break;
+            case 'M:M': startLabel = 'N'; endLabel = 'N'; startMarker = 'many'; endMarker = 'many'; break;
+            default: startLabel = 'N'; endLabel = '1'; startMarker = 'many'; endMarker = 'one';
+          }
+          lines.push({ key: lineKey, points, startPos, endPos, startLabel, endLabel, startMarker, endMarker, cardinality: card });
+        }
+      }
+    }
+    return lines;
+  }, [tables, positions, tableDims, linePaths]);
+
+  const canvasBounds = useMemo(() => {
+    const container = containerRef.current;
+    const cw = container?.clientWidth || 1200;
+    const ch = container?.clientHeight || 800;
+    const PAD = 1200;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const t of tables) {
+      const p = positions[t.id];
+      if (!p) continue;
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + 310);
+      maxY = Math.max(maxY, p.y + tableHeight(t));
+    }
+    const w = isFinite(maxX) ? maxX - minX + PAD * 2 : cw;
+    const h = isFinite(maxY) ? maxY - minY + PAD * 2 : ch;
+    return { width: Math.max(w, cw), height: Math.max(h, ch) };
+  }, [tables, positions]);
+
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    onPositionsChange(null, null, e.deltaY > 0 ? -0.1 : 0.1);
+  }, [onPositionsChange]);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [handleWheel]);
+
+  const handleMouseDown = useCallback((e, tableId) => {
+    if (e.button !== 0) return; e.stopPropagation();
+    const pos = positions[tableId]; if (!pos) return;
+    const curSel = selectedTablesRef.current;
+    const tableSelected = curSel[tableId];
+    const multiCount = Object.keys(curSel).length;
+    let dragInfo;
+    if (tableSelected && multiCount > 1) {
+      const origins = {};
+      for (const id of Object.keys(curSel)) { const p = positions[id]; if (p) origins[id] = { x: p.x, y: p.y }; }
+      dragInfo = { tableId, startX: e.clientX, startY: e.clientY, origins, moved: false };
+    } else dragInfo = { tableId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, moved: false };
+    if (linePaths) {
+      const dragIds = dragInfo.origins ? Object.keys(dragInfo.origins) : [tableId];
+      const dragNames = new Set(tables.filter(t => dragIds.includes(t.id)).map(t => t.name));
+      const affected = {};
+      for (const [key, pts] of Object.entries(linePaths)) {
+        const d1 = key.indexOf('-'); if (d1 === -1) continue;
+        const srcId = key.substring(0, d1);
+        const d2 = key.indexOf('-', d1 + 1); if (d2 === -1) continue;
+        const refTable = key.substring(d2 + 1);
+        const indices = [];
+        if (dragIds.includes(srcId)) indices.push(0);
+        if (dragNames.has(refTable)) indices.push(pts.length - 1);
+        if (indices.length > 0) affected[key] = { pts: pts.map(p => ({...p})), indices };
+      }
+      dragInfo.affectedLinePaths = affected;
+    }
+    dragRef.current = dragInfo;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [positions, tables, linePaths, handleMouseMove, handleMouseUp]);
+
+  const handleWaypointMove = useCallback((e) => {
+    const dr = waypointDragRef.current;
+    if (!dr) return;
+    const dx = (e.clientX - dr.startX) / zoomRef.current;
+    const dy = (e.clientY - dr.startY) / zoomRef.current;
+    const pi = dr.pointIndex;
+    const orig = dr.origPoints;
+    if (pi <= 0 || pi >= orig.length - 1) {
+      let newPoints = orig.map((p, i) => i === pi ? { x: p.x + dx, y: p.y + dy } : { ...p });
+      newPoints = snapEndpoints(newPoints, dr.lineKey, tablesRef.current, positionsRef.current, tableDimsRef.current);
+      onUpdateLinePath(dr.lineKey, newPoints);
+      return;
+    }
+    const eps = 0.5;
+    const prevH = Math.abs(orig[pi - 1].y - orig[pi].y) < eps;
+    const nextH = Math.abs(orig[pi].y - orig[pi + 1].y) < eps;
+    const newPoints = orig.map(p => ({ ...p }));
+    newPoints[pi].x = orig[pi].x + dx;
+    newPoints[pi].y = orig[pi].y + dy;
+    if (prevH && !nextH) {
+      newPoints[pi - 1].x = orig[pi - 1].x;
+      newPoints[pi - 1].y = newPoints[pi].y;
+      newPoints[pi + 1].x = newPoints[pi].x;
+      newPoints[pi + 1].y = orig[pi + 1].y;
+    } else if (!prevH && nextH) {
+      newPoints[pi - 1].x = newPoints[pi].x;
+      newPoints[pi - 1].y = orig[pi - 1].y;
+      newPoints[pi + 1].x = orig[pi + 1].x;
+      newPoints[pi + 1].y = newPoints[pi].y;
+    } else {
+      newPoints[pi] = { x: orig[pi].x + dx, y: orig[pi].y + dy };
+    }
+    const snappedPoints = snapEndpoints(newPoints, dr.lineKey, tablesRef.current, positionsRef.current, tableDimsRef.current);
+    onUpdateLinePath(dr.lineKey, snappedPoints);
+  }, [onUpdateLinePath]);
+
+  const handleLineMouseDown = useCallback((e, lineKey, points) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const mx = (e.clientX - rect.left - pan.x) / zoom;
+    const my = (e.clientY - rect.top - pan.y) / zoom;
+    let bestSeg = 0, bestDist = Infinity;
+    for (let i = 0; i < points.length - 1; i++) {
+      const ax = points[i].x, ay = points[i].y;
+      const bx = points[i + 1].x, by = points[i + 1].y;
+      const dx = bx - ax, dy = by - ay;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.001) continue;
+      const t = Math.max(0, Math.min(1, ((mx - ax) * dx + (my - ay) * dy) / (len * len)));
+      const cx = ax + t * dx, cy = ay + t * dy;
+      const dist = Math.hypot(mx - cx, my - cy);
+      if (dist < bestDist) { bestDist = dist; bestSeg = i; }
+    }
+    const newPoints = [...points];
+    const newIndex = bestSeg + 1;
+    newPoints.splice(newIndex, 0, { x: mx, y: my });
+    onUpdateLinePath(lineKey, newPoints);
+    setActiveFk(lineKey);
+    waypointDragRef.current = {
+      lineKey, pointIndex: newIndex,
+      startX: e.clientX, startY: e.clientY,
+      origPoints: newPoints.map(p => ({ ...p }))
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pan, zoom, onUpdateLinePath, handleMouseMove, handleMouseUp]);
+
+  const handleWaypointDoubleClick = useCallback((e, lineKey, pointIndex, points) => {
+    e.preventDefault(); e.stopPropagation();
+    if (points.length <= 2) return;
+    const newPoints = points.filter((_, i) => i !== pointIndex);
+    if (newPoints.length < 2) { onResetLinePath(lineKey); return; }
+    onUpdateLinePath(lineKey, newPoints);
+  }, [onUpdateLinePath, onResetLinePath]);
+
+  const processMouseEvent = useCallback((e) => {
+    if (dragRef.current) {
+      const dr = dragRef.current;
+      const dx = (e.clientX - dr.startX) / zoomRef.current;
+      const dy = (e.clientY - dr.startY) / zoomRef.current;
+      if (Math.abs(e.clientX - dr.startX) > 3 || Math.abs(e.clientY - dr.startY) > 3) dr.moved = true;
+      if (dr.origins) {
+        for (const id of Object.keys(dr.origins)) onPositionsChange(id, dr.origins[id].x + dx, dr.origins[id].y + dy);
+      } else onPositionsChange(dr.tableId, dr.origX + dx, dr.origY + dy);
+      if (dr.affectedLinePaths) {
+        for (const [key, { pts: origPts, indices }] of Object.entries(dr.affectedLinePaths)) {
+          const newPoints = origPts.map((p, i) => indices.includes(i) ? { x: p.x + dx, y: p.y + dy } : { ...p });
+          for (const idx of indices) {
+            const eps = 0.5;
+            if (idx === 0 && newPoints.length >= 2) {
+              if (Math.abs(origPts[0].y - origPts[1].y) < eps) { newPoints[1].y = newPoints[0].y; }
+              else { newPoints[1].x = newPoints[0].x; }
+            }
+            if (idx === newPoints.length - 1 && newPoints.length >= 2) {
+              const last = newPoints.length - 1;
+              if (Math.abs(origPts[last - 1].y - origPts[last].y) < eps) { newPoints[last - 1].y = newPoints[last].y; }
+              else { newPoints[last - 1].x = newPoints[last].x; }
+            }
+          }
+          const snappedPts = snapEndpoints(newPoints, key, tablesRef.current, positionsRef.current, tableDimsRef.current);
+          onUpdateLinePath(key, snappedPts);
+        }
+      }
+      return;
+    }
+    if (panDragRef.current) {
+      setPan({ x: panDragRef.current.origPanX + (e.clientX - panDragRef.current.startX), y: panDragRef.current.origPanY + (e.clientY - panDragRef.current.startY) });
+    }
+    handleWaypointMove(e);
+  }, [onPositionsChange, handleWaypointMove, onUpdateLinePath]);
+
+  const handleMouseMove = useCallback((e) => {
+    pendingMouseEvent.current = e;
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const ev = pendingMouseEvent.current;
+        if (ev && (dragRef.current || panDragRef.current || waypointDragRef.current)) processMouseEvent(ev);
+      });
+    }
+  }, [processMouseEvent]);
+
+  const handleMouseUp = useCallback((e) => {
+    if (waypointDragRef.current) waypointDragRef.current = null;
+    if (dragRef.current) {
+      if (!dragRef.current.moved && e.target.closest('.table-card')) onSelectTable(dragRef.current.tableId, e.ctrlKey || e.metaKey);
+      dragRef.current = null;
+    }
+    if (panDragRef.current) { panDragRef.current = null; setIsPanning(false); }
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    pendingMouseEvent.current = null;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  }, [onSelectTable]);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
+  const handleWaypointHandleMouseDown = useCallback((e, lineKey, pointIndex) => {
+    e.stopPropagation();
+    const srcPoints = (linePaths && linePaths[lineKey]) || svgLines.find(l => l.key === lineKey)?.points;
+    if (!srcPoints) return;
+    waypointDragRef.current = {
+      lineKey, pointIndex,
+      startX: e.clientX, startY: e.clientY,
+      origPoints: srcPoints.map(p => ({ ...p }))
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [linePaths, svgLines, handleMouseMove, handleMouseUp]);
+
+  const handleCanvasMouseDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    if (e.target.closest('.table-card') || e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea')) return;
+    onSelectTable(null); e.preventDefault();
+    panDragRef.current = { startX: e.clientX, startY: e.clientY, origPanX: pan.x, origPanY: pan.y };
+    setIsPanning(true);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [pan.x, pan.y, handleMouseMove, handleMouseUp, onSelectTable]);
+
+  return (
+    <div ref={containerRef}
+      className={`diagram-container diagram-pattern relative w-full h-full overflow-hidden ${isPanning ? 'panning' : ''}`}
+      onMouseDown={handleCanvasMouseDown}>
+      <div ref={canvasRef} className="diagram-canvas absolute" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: '0 0', width: canvasBounds.width, height: canvasBounds.height }}>
+        <svg className="absolute inset-0 w-full h-full diagram-svg" style={{ pointerEvents: 'none', overflow: 'visible', zIndex: 0 }}>
+          <defs>
+            <marker id="one-marker" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="one-marker-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="one-marker-end" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="one-marker-end-hl" viewBox="0 0 12 12" refX="6" refY="6" markerWidth="10" markerHeight="10" orient="auto"><line x1="6" y1="1" x2="6" y2="11" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="many-marker-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="0" y1="2" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="12" x2="5" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="0" y1="7" x2="5" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <marker id="many-marker-end" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="1.5" opacity="0.85" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" opacity="0.85" /></marker>
+            <marker id="many-marker-end-hl" viewBox="0 0 16 14" refX="0" refY="7" markerWidth="14" markerHeight="12" orient="auto"><line x1="5" y1="2" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="12" x2="0" y2="7" stroke="#ffffff" strokeWidth="2" /><line x1="5" y1="7" x2="0" y2="7" stroke="#ffffff" strokeWidth="2.5" /></marker>
+            <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+          {tables.length > 0 && <rect x="0" y="0" width={canvasBounds.width} height={canvasBounds.height} fill="transparent" stroke="rgba(139, 148, 158, 0.5)" strokeWidth="2" strokeDasharray="10 6" rx="6" ry="6" style={{ pointerEvents: 'none' }} />}
+          {tables.length > 0 && (() => { const c = '#8b949e', o = 0.4, s = 24, g = 4, w = canvasBounds.width, h = canvasBounds.height; return (<g opacity={o} stroke={c} strokeWidth="2" fill="none" style={{ pointerEvents: 'none' }}><path d={`M${g},${g + s} L${g},${g} L${g + s},${g}`} /><path d={`M${w - g - s},${g} L${w - g},${g} L${w - g},${g + s}`} /><path d={`M${g},${h - g - s} L${g},${h - g} L${g + s},${h - g}`} /><path d={`M${w - g - s},${h - g} L${w - g},${h - g} L${w - g},${h - g - s}`} /></g>); })()}
+          {svgLines.map(l => {
+            const isActive = activeFk === l.key; const isHovered = hoveredFk === l.key; const highlight = isActive || isHovered;
+            const pathStr = pointsToAngularPath(l.points);
+            const hasCustomPath = linePaths && linePaths[l.key];
+            const op = highlight ? 0.85 : 0.5;
+            const L = 8;
+            const pts = l.points;
+            let markerD = '';
+            if (pts.length >= 2) {
+              const p0 = pts[0], p1 = pts[1], pn = pts[pts.length - 2], pp = pts[pts.length - 1];
+              const aStart = Math.atan2(p1.y - p0.y, p1.x - p0.x);
+              const aEnd = Math.atan2(pp.y - pn.y, pp.x - pn.x);
+              const [sx, sy] = [Math.cos(aStart), Math.sin(aStart)];
+              const [ex, ey] = [Math.cos(aEnd), Math.sin(aEnd)];
+              const [psx, psy] = [Math.cos(aStart + Math.PI / 2), Math.sin(aStart + Math.PI / 2)];
+              const [pex, pey] = [Math.cos(aEnd + Math.PI / 2), Math.sin(aEnd + Math.PI / 2)];
+              const parts = [];
+              if (l.startMarker === 'one') parts.push(`M${(p0.x + psx * L * 0.7).toFixed(1)},${(p0.y + psy * L * 0.7).toFixed(1)} L${(p0.x - psx * L * 0.7).toFixed(1)},${(p0.y - psy * L * 0.7).toFixed(1)}`);
+              if (l.startMarker === 'many') {
+                const f = L * 0.7, s = L * 0.7;
+                const cx = p0.x + sx * f, cy = p0.y + sy * f;
+                parts.push(`M${(p0.x + psx * s).toFixed(1)},${(p0.y + psy * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+                parts.push(`M${(p0.x - psx * s).toFixed(1)},${(p0.y - psy * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+                parts.push(`M${p0.x},${p0.y} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+              }
+              if (l.endMarker === 'one') parts.push(`M${(pp.x + pex * L * 0.7).toFixed(1)},${(pp.y + pey * L * 0.7).toFixed(1)} L${(pp.x - pex * L * 0.7).toFixed(1)},${(pp.y - pey * L * 0.7).toFixed(1)}`);
+              if (l.endMarker === 'many') {
+                const f = L * 0.7, s = L * 0.7;
+                const cx = pp.x - ex * f, cy = pp.y - ey * f;
+                parts.push(`M${(pp.x + pex * s).toFixed(1)},${(pp.y + pey * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+                parts.push(`M${(pp.x - pex * s).toFixed(1)},${(pp.y - pey * s).toFixed(1)} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+                parts.push(`M${pp.x},${pp.y} L${cx.toFixed(1)},${cy.toFixed(1)}`);
+              }
+              markerD = parts.join(' ');
+            }
+            return (
+              <g key={l.key}>
+                <path d={pathStr} stroke="transparent" strokeWidth={highlight ? 28 : 20} fill="none" style={{ pointerEvents: 'stroke', cursor: 'pointer', transition: 'stroke-width 0.35s ease' }} onMouseDown={e => { if (isActive) { handleLineMouseDown(e, l.key, l.points); } else { setActiveFk(l.key); } if (pulseTimeoutRef.current) clearTimeout(pulseTimeoutRef.current); setPulseFk(l.key); pulseTimeoutRef.current = setTimeout(() => setPulseFk(null), 2400); }} onMouseEnter={() => setHoveredFk(l.key)} onMouseLeave={() => setHoveredFk(h => h === l.key ? null : h)} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 2.5 : 1.5} strokeLinecap="round" strokeLinejoin="round" opacity={op} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" filter="url(#glow)" opacity={highlight ? 0.3 : 0} style={{ pointerEvents: 'none', transition: 'opacity 0.5s ease' }} />
+                <path d={pathStr} stroke="#ffffff" strokeWidth={highlight ? 4 : 3} strokeDasharray="0, 10" strokeLinecap="round" opacity={op} fill="none" style={{ pointerEvents: 'none', transition: 'opacity 0.4s ease, stroke-width 0.4s ease' }} />
+                {markerD && <path d={markerD} stroke="#ffffff" strokeWidth={highlight ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round" opacity={op} fill="none" style={{ pointerEvents: 'none' }} />}
+                {(isActive || isHovered) && l.points.map((p, pi) => {
+                  const isEndpoint = pi === 0 || pi === l.points.length - 1;
+                  return (
+                    <g key={`h-${pi}`}>
+                      <circle cx={p.x} cy={p.y} r={isEndpoint ? 4 : 5}
+                        fill={isEndpoint ? '#ffffff' : '#c4b5fd'}
+                        stroke={isEndpoint ? '#4f46e5' : '#a371f7'}
+                        strokeWidth={isEndpoint ? 1.5 : 2} opacity={1}
+                        filter={!isEndpoint ? 'url(#glow)' : undefined}
+                        style={{ cursor: isEndpoint ? 'grab' : 'grab', pointerEvents: 'all' }}
+                        onMouseDown={e => handleWaypointHandleMouseDown(e, l.key, pi)}
+                        onDoubleClick={e => handleWaypointDoubleClick(e, l.key, pi, l.points)} />
+                      {!isEndpoint && (
+                        <circle cx={p.x} cy={p.y} r={2.5} fill="#7c3aed" opacity={0.6} style={{ pointerEvents: 'none' }} />
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+        </svg>
+        {tables.map(t => (
+          <TableNode key={t.id} ref={el => tableRefs.current[t.id] = el}
+            table={t} position={positions[t.id] || { x: 0, y: 0 }} selected={!!selectedTables[t.id]}
+            onSelect={onSelectTable} onDragStart={handleMouseDown}
+            activeFk={activeFk} hoveredFk={hoveredFk} fkInfo={fkInfo} pulseFk={pulseFk} />
+        ))}
+      </div>
+      {activeFk && fkInfo[activeFk] && (() => {
+        const key = activeFk; const info = fkInfo[key]; const srcTable = tableByIdRef.current[info.tableId]; const tgtTable = tableByNameRef.current[info.refTable];
+        return (
+          <div className="absolute top-4 left-4 bg-[#21262d]/90  border border-white/20 rounded-xl p-3 shadow-lg z-20 ">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-center"><div className="text-[12px] text-[#6e7681]">Origen</div><div className="text-sm font-semibold text-white">{srcTable?.name || '?'}.{info.column}</div></div>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              <div className="text-center"><div className="text-[12px] text-[#6e7681]">Destino</div><div className="text-sm font-semibold text-white">{info.refTable}.{info.refColumn}</div></div>
+              <button onClick={() => setActiveFk(null)} className="text-[#6e7681] p-0.5 rounded"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+            </div>
+            {activeFk && linePaths[key] && (
+              <div className="flex items-center gap-1.5 border-t border-[#30363d]/30 pt-2 mt-2">
+                <span className="text-[11px] text-[#6e7681] shrink-0">Ruta:</span>
+                <button onClick={e => { e.stopPropagation(); onResetLinePath(key); }}
+                  className="text-[10px] font-bold px-2 py-1 rounded border bg-[#f85149]/20 border-[#f85149]/50 text-[#f85149]"
+                  title="Restaurar ruta automática">&times; Auto</button>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+      {tables.length > 0 && (
+        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-[#21262d]/90 border border-[#30363d]/60 rounded-xl p-2 shadow-lg z-20">
+          <button onClick={fitToScreen} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center" title="Ajustar al contenedor">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+          <button onClick={() => onPositionsChange(null, null, -0.1)} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">-</button>
+          <span className="text-[12px] text-[#8b949e] w-12 text-center font-mono">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => onPositionsChange(null, null, 0.1)} className="text-[#8b949e] bg-[#30363d]/50 rounded-lg w-9 h-9 flex items-center justify-center text-lg font-bold">+</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEMO_SQL = `CREATE TABLE clientes (
   id INT PRIMARY KEY AUTO_INCREMENT,
   nombre VARCHAR(100) NOT NULL,
   email VARCHAR(255) UNIQUE,
@@ -96,188 +775,168 @@ const sql = `CREATE TABLE clientes (
   activo BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE pedido (
+CREATE TABLE categorias (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  nombre VARCHAR(100) NOT NULL,
+  descripcion TEXT
+);
+
+CREATE TABLE productos (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  nombre VARCHAR(200) NOT NULL,
+  precio DECIMAL(10,2) NOT NULL,
+  stock INT DEFAULT 0,
+  categoria_id INT,
+  FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+);
+
+CREATE TABLE pedidos (
   id INT PRIMARY KEY AUTO_INCREMENT,
   cliente_id INT NOT NULL,
   fecha DATETIME,
   total DECIMAL(10,2),
   estado VARCHAR(20) DEFAULT 'pendiente',
   FOREIGN KEY (cliente_id) REFERENCES clientes(id)
+);
+
+CREATE TABLE pedido_productos (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  pedido_id INT NOT NULL,
+  producto_id INT NOT NULL,
+  cantidad INT NOT NULL,
+  precio_unitario DECIMAL(10,2),
+  FOREIGN KEY (pedido_id) REFERENCES pedidos(id),
+  FOREIGN KEY (producto_id) REFERENCES productos(id)
 );`;
 
-function highlightSql(text) {
-  return text
-    .replace(/(--[^\n]*)/g, '<span class="sql-comment">$1</span>')
-    .replace(/\b(CREATE|TABLE|PRIMARY|KEY|AUTO_INCREMENT|NOT|NULL|UNIQUE|DEFAULT|TRUE|FALSE|FOREIGN|REFERENCES|INT|VARCHAR|DATE|DATETIME|DECIMAL|BOOLEAN)\b/g, '<span class="sql-kw">$1</span>')
-    .replace(/\((\d+(?:,\d+)?)\)/g, '<span class="sql-num">($1)</span>')
-    .replace(/'(?:[^'\\]|\\.)*'/g, '<span class="sql-str">$&</span>');
-}
-document.getElementById('sqlDisplay').innerHTML = highlightSql(sql);
+function App() {
+  const [sql] = useState(DEMO_SQL);
+  const [tables, setTables] = useState([]);
+  const [selectedTables, setSelectedTables] = useState({});
+  const [zoom, setZoom] = useState(1);
+  const [positions, setPositions] = useState({});
+  const [linePaths, setLinePaths] = useState({});
+  const [fitKey, setFitKey] = useState(0);
 
-const tableData = [
-  {
-    name: 'clientes', color: '#6366f1',
-    cols: [
-      { name: 'id', type: 'INT', badges: ['PK', 'AI'] },
-      { name: 'nombre', type: 'VARCHAR', badges: ['NN'] },
-      { name: 'email', type: 'VARCHAR', badges: ['UQ'] },
-      { name: 'telefono', type: 'VARCHAR', badges: [] },
-      { name: 'fecha_registro', type: 'DATE', badges: [] },
-      { name: 'activo', type: 'BOOLEAN', badges: [] },
-    ]
-  },
-  {
-    name: 'pedido', color: '#22c55e',
-    cols: [
-      { name: 'id', type: 'INT', badges: ['PK', 'AI'] },
-      { name: 'cliente_id', type: 'INT', badges: ['NN', 'FK'] },
-      { name: 'fecha', type: 'DATETIME', badges: [] },
-      { name: 'total', type: 'DECIMAL', badges: [] },
-      { name: 'estado', type: 'VARCHAR', badges: [] },
-    ]
-  }
-];
+  useEffect(() => {
+    try {
+      const clean = stripSQLComments(sql);
+      if (!clean.trim()) return;
+      const parsed = parseSQL(clean);
+      if (parsed.length === 0) return;
+      const sorted = sortTablesByRelations(parsed);
+      setPositions(autoLayout(sorted));
+      setTables(sorted);
+      setFitKey(k => k + 1);
+    } catch (e) {}
+  }, []);
 
-function buildCard(t, x, y) {
-  const div = document.createElement('div');
-  div.className = 'table-card';
-  div.style.left = x + 'px';
-  div.style.top = y + 'px';
-  div.dataset.table = t.name;
-  div.innerHTML =
-    `<div class="table-header" style="background:linear-gradient(180deg,${t.color}15,${t.color}03);border-bottom-color:${t.color}35">` +
-      `<div class="table-dot" style="background:${t.color};box-shadow:0 0 8px ${t.color}50"></div>` +
-      `<span class="table-name">${t.name}</span>` +
-    `</div>` +
-    `<div class="table-cols">` +
-      t.cols.map(c => {
-        const badges = c.badges.map(b => {
-          const cls = b === 'PK' ? 'badge-pk' : b === 'FK' ? 'badge-fk' : b === 'NN' ? 'badge-nn' : b === 'AI' ? 'badge-ai' : 'badge-uq';
-          return `<span class="col-badge ${cls}">${b}</span>`;
-        }).join('');
-        return `<div class="table-col">` +
-          `<span class="col-type" style="background:${t.color}08;border-color:${t.color}15;color:${t.color}">${c.type}</span>` +
-          `<span class="col-name">${c.name}</span>` +
-          `${badges}` +
-        `</div>`;
-      }).join('') +
-    `</div>` +
-    `<div class="relation-line">` +
-      `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>` +
-      `FK: cliente_id → clientes(id)` +
-    `</div>`;
-  return div;
-}
+  const handlePositionChange = useCallback((tid, key, val) => {
+    if (tid === null && key === null) {
+      if (typeof val === 'number') { setZoom(z => Math.max(0.25, Math.min(3, z + val))); return; }
+      if (val && typeof val === 'object' && val.abs !== undefined) { setZoom(Math.max(0.25, Math.min(3, val.abs))); return; }
+      return;
+    }
+    setPositions(prev => {
+      if (!prev[tid]) return prev;
+      return { ...prev, [tid]: { x: key, y: val } };
+    });
+  }, []);
 
-const canvas = document.getElementById('diagramCanvas');
-const wrap = document.getElementById('diagramWrap');
-const svg = document.getElementById('relationSvg');
+  const handleLinePathChange = useCallback((key, points) => {
+    setLinePaths(prev => ({ ...prev, [key]: points }));
+  }, []);
 
-let zoom = 1;
-let panX = 0, panY = 0;
-let isPanning = false, panStart = {};
+  const handleResetLinePath = useCallback((key) => {
+    setLinePaths(prev => { const next = { ...prev }; delete next[key]; return next; });
+  }, []);
 
-const cards = [];
-const positions = [
-  { x: 60, y: 30 },
-  { x: 420, y: 100 }
-];
+  const handleSelectTable = useCallback((id, ctrlKey) => {
+    if (id === null) { setSelectedTables({}); return; }
+    setSelectedTables(prev => {
+      if (ctrlKey) { const next = { ...prev }; if (next[id]) { delete next[id]; return next; } next[id] = true; return next; }
+      return { [id]: true };
+    });
+  }, []);
 
-tableData.forEach((t, i) => {
-  const card = buildCard(t, positions[i].x, positions[i].y);
-  canvas.appendChild(card);
-  cards.push(card);
-  makeDraggable(card, t);
-});
+  const arrSql = useMemo(() => {
+    const lines = sql.split('\n');
+    return { text: sql, lines: lines.length };
+  }, [sql]);
 
-function updateSvg() {
-  const c1 = cards[0], c2 = cards[1];
-  const r1 = c1.getBoundingClientRect(), r2 = c2.getBoundingClientRect();
-  const cr = canvas.getBoundingClientRect();
-  const x1 = r1.left - cr.left + r1.width / 2;
-  const y1 = r1.top - cr.top + r1.height;
-  const x2 = r2.left - cr.left + r2.width / 2;
-  const y2 = r2.top - cr.top;
-  svg.innerHTML =
-    `<defs><marker id="one" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="8" markerHeight="8" orient="auto"><line x1="1" y1="1" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/><line x1="1" y1="9" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/><line x1="1" y1="5" x2="8" y2="5" stroke="#8b949e" stroke-width="1.5"/></marker></defs>` +
-    `<line x1="${x1}" y1="${y1}" x2="${x1}" y2="${(y1+y2)/2}" stroke="#484f58" stroke-width="2"/>` +
-    `<line x1="${x1}" y1="${(y1+y2)/2}" x2="${x2}" y2="${(y1+y2)/2}" stroke="#484f58" stroke-width="2"/>` +
-    `<line x1="${x2}" y1="${(y1+y2)/2}" x2="${x2}" y2="${y2}" stroke="#484f58" stroke-width="2" marker-end="url(#one)"/>` +
-    `<text x="${(x1+x2)/2}" y="${(y1+y2)/2 - 6}" text-anchor="middle" fill="#6e7681" font-size="10" font-family="SF Mono,monospace">1</text>` +
-    `<text x="${(x1+x2)/2}" y="${(y1+y2)/2 + 14}" text-anchor="middle" fill="#6e7681" font-size="10" font-family="SF Mono,monospace">N</text>`;
-}
-requestAnimationFrame(updateSvg);
+  const sqlHtml = useMemo(() => highlightSql(sql), [sql]);
 
-function makeDraggable(card) {
-  let drag = null;
-  const header = card.querySelector('.table-header');
-  header.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    const rect = canvas.getBoundingClientRect();
-    const scale = zoom;
-    drag = {
-      startX: e.clientX, startY: e.clientY,
-      origLeft: parseFloat(card.style.left),
-      origTop: parseFloat(card.style.top),
-      rect, scale
-    };
-    card.classList.add('dragging');
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  });
-  function onMove(e) {
-    if (!drag) return;
-    const dx = (e.clientX - drag.startX) / drag.scale;
-    const dy = (e.clientY - drag.startY) / drag.scale;
-    card.style.left = (drag.origLeft + dx) + 'px';
-    card.style.top = (drag.origTop + dy) + 'px';
-    updateSvg();
-  }
-  function onUp() {
-    drag = null;
-    card.classList.remove('dragging');
-    document.removeEventListener('mousemove', onMove);
-    document.removeEventListener('mouseup', onUp);
-  }
+  return (
+    <div className="h-screen flex flex-col bg-[#0d1117] overflow-hidden">
+      <header className="bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 border-b border-[#21262d]/50">
+        <div className="flex items-center gap-3">
+          <div className="bg-[#1f6feb]/20 rounded-lg p-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#58a6ff]">
+              <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+            </svg>
+          </div>
+          <h1 className="text-lg font-bold text-[#c9d1d9]">Diagram Generator &mdash; Demo</h1>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {tables.length > 0 && (
+            <div className="flex bg-[#21262d]/80 rounded-lg border border-[#30363d]/50">
+              <button data-export="png" onClick={() => exportPNG(`demo-diagrama-${Date.now()}.png`)}
+                className="text-[12px] font-medium px-2.5 h-8 text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#30363d]/50 border-r border-[#30363d]/50 flex items-center gap-1.5 transition-colors rounded-l-lg shadow-md" title="Exportar PNG">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                PNG
+              </button>
+              <button data-export="pdf" onClick={() => exportPDF(`demo-diagrama-${Date.now()}.pdf`)}
+                className="text-[12px] font-medium px-2.5 h-8 text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#30363d]/50 flex items-center gap-1.5 transition-colors rounded-r-lg shadow-md" title="Exportar PDF">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                PDF
+              </button>
+            </div>
+          )}
+          <span className="text-[11px] text-[#6e7681] font-mono ml-2">{tables.length} tablas</span>
+        </div>
+      </header>
+
+      <div className="flex-1 flex overflow-hidden">
+        <div className="w-[420px] overflow-hidden shrink-0 border-r border-[#21262d]/50 bg-[#161b22]/30 flex flex-col">
+          <div className="p-2.5 flex flex-col h-full">
+            <div className="flex items-center gap-1 mb-2 shrink-0 border-b border-[#30363d]/40 pb-2.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#58a6ff]"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <span className="text-[11px] font-medium text-[#8b949e]">SQL de ejemplo</span>
+              <span className="text-[10px] text-[#484f58] ml-auto">{arrSql.lines} líneas</span>
+            </div>
+            <div className="flex-1 relative min-h-0">
+              <div className="absolute inset-0 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-auto">
+                <pre className="p-4 m-0 text-[12px] leading-relaxed text-[#c9d1d9] whitespace-pre-wrap break-all bg-transparent select-text"
+                  style={{ fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace" }}
+                  dangerouslySetInnerHTML={{ __html: sqlHtml || '&nbsp;' }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 relative diagram-container overflow-hidden">
+            <Diagram
+              tables={tables}
+              selectedTables={selectedTables}
+              onSelectTable={handleSelectTable}
+              onPositionsChange={handlePositionChange}
+              positions={positions}
+              zoom={zoom}
+              linePaths={linePaths}
+              onUpdateLinePath={handleLinePathChange}
+              onResetLinePath={handleResetLinePath}
+              fitKey={fitKey}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-(function setupPanZoom() {
-  wrap.addEventListener('mousedown', e => {
-    if (e.button !== 0) return;
-    if (e.target.closest('.table-card') || e.target.closest('.zoom-controls')) return;
-    isPanning = true;
-    panStart = { x: e.clientX - panX, y: e.clientY - panY };
-    wrap.style.cursor = 'grabbing';
-  });
-  document.addEventListener('mousemove', e => {
-    if (!isPanning) return;
-    panX = e.clientX - panStart.x;
-    panY = e.clientY - panStart.y;
-    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-  });
-  document.addEventListener('mouseup', () => {
-    isPanning = false;
-    wrap.style.cursor = 'grab';
-  });
-  wrap.addEventListener('wheel', e => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    zoom = Math.max(0.25, Math.min(3, zoom + delta));
-    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
-  }, { passive: false });
-  document.getElementById('zoomIn').addEventListener('click', () => {
-    zoom = Math.min(3, zoom + 0.1);
-    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
-  });
-  document.getElementById('zoomOut').addEventListener('click', () => {
-    zoom = Math.max(0.25, zoom - 0.1);
-    canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
-    document.getElementById('zoomLabel').textContent = Math.round(zoom * 100) + '%';
-  });
-})();
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
 </script>
 </body>
 </html>
