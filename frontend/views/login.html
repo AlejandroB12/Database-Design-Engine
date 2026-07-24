@@ -397,8 +397,100 @@ a { text-decoration: none; color: inherit; }
   align-items: center;
   justify-content: center;
   padding: 2rem;
-  background: linear-gradient(135deg, rgba(13,17,23,0.6) 0%, #0d1117 40%);
+  background: #0d1117;
   position: relative;
+  overflow: hidden;
+}
+
+.bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(48,54,61,0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(48,54,61,0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, black 20%, transparent 70%);
+  pointer-events: none;
+}
+
+.bg-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(88,166,255,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 500px 500px at 80% 80%, rgba(163,113,247,0.05) 0%, transparent 60%),
+    radial-gradient(ellipse 400px 300px at 60% 10%, rgba(63,185,80,0.03) 0%, transparent 50%);
+  pointer-events: none;
+  animation: ambientGlow 8s ease-in-out infinite alternate;
+}
+
+.glass-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(13,17,23,0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, black 25%, transparent 72%);
+  -webkit-mask-image: radial-gradient(ellipse 85% 75% at 50% 50%, black 25%, transparent 72%);
+  pointer-events: none;
+}
+
+@keyframes ambientGlow {
+  0% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+
+.floating-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(60px);
+  opacity: 0.15;
+}
+
+.floating-orb:nth-child(1) {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(88,166,255,0.3) 0%, transparent 70%);
+  top: -80px;
+  right: -60px;
+  animation: orbFloat1 12s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(2) {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(163,113,247,0.25) 0%, transparent 70%);
+  bottom: 40px;
+  left: -40px;
+  animation: orbFloat2 10s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(3) {
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(63,185,80,0.15) 0%, transparent 70%);
+  top: 50%;
+  right: 10%;
+  animation: orbFloat3 14s ease-in-out infinite;
+}
+
+@keyframes orbFloat1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, 40px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+
+@keyframes orbFloat2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(40px, -30px) scale(1.15); }
+}
+
+@keyframes orbFloat3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-30px, -20px) scale(1.1); }
 }
 
 @media (min-width: 900px) {
@@ -410,6 +502,8 @@ a { text-decoration: none; color: inherit; }
 .form-container {
   width: 100%;
   max-width: 400px;
+  position: relative;
+  z-index: 1;
 }
 
 .form-header {
@@ -437,16 +531,41 @@ a { text-decoration: none; color: inherit; }
 }
 
 .form-header h2 {
-  color: var(--text-primary);
-  font-size: 1.75rem;
+  font-size: 1.85rem;
   font-weight: 800;
-  margin-bottom: 0.35rem;
-  letter-spacing: -0.02em;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #e6edf3 0%, #58a6ff 50%, #a371f7 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 200% 200%;
+  animation: titleGradient 4s ease-in-out infinite, titleSlideUp 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+@keyframes titleGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes titleSlideUp {
+  0% { opacity: 0; transform: translateY(20px) scale(0.95); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
 .form-header p {
   color: var(--text-muted);
   font-size: 0.9rem;
+  opacity: 0;
+  animation: subtitleFade 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: 0.3s;
+}
+
+@keyframes subtitleFade {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .form-group {
@@ -773,6 +892,12 @@ a { text-decoration: none; color: inherit; }
 </div>
 
 <div class="right-panel">
+  <div class="bg-grid"></div>
+  <div class="bg-glow"></div>
+  <div class="glass-overlay"></div>
+  <div class="floating-orb"></div>
+  <div class="floating-orb"></div>
+  <div class="floating-orb"></div>
   <div class="form-container">
     <div class="form-header">
       <div class="mobile-icon">
