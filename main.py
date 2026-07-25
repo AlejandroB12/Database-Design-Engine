@@ -14,17 +14,13 @@ app.mount("/images", StaticFiles(directory="assets/images"), name="images")
 async def index():
     return FileResponse("frontend/views/diagram-generator", media_type="text/html")
 
-@app.get("/creador")
-async def creador():
-    return FileResponse("frontend/views/diagram-creator", media_type="text/html")
-
 @app.get("/demo")
 async def demo():
     return FileResponse("frontend/views/demo-generator", media_type="text/html")
 
 @app.get("/")
 async def landing():
-    return FileResponse("index.html", media_type="text/html")
+    return FileResponse("frontend/views/index.html", media_type="text/html")
 
 @app.get("/login")
 async def login():
