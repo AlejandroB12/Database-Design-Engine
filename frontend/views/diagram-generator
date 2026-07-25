@@ -1379,6 +1379,113 @@ function SortPanel({ tables, categories, tableCategory, onSort, onClose }) {
     </div>
   );
 }
+
+function Sidebar({ activeView, onNavigate }) {
+  const items = [
+    { id: 'dashboard', icon: React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+        React.createElement('rect', { x: 3, y: 3, width: 7, height: 7, rx: 1 }),
+        React.createElement('rect', { x: 14, y: 3, width: 7, height: 7, rx: 1 }),
+        React.createElement('rect', { x: 3, y: 14, width: 7, height: 7, rx: 1 }),
+        React.createElement('rect', { x: 14, y: 14, width: 7, height: 7, rx: 1 })
+      ), tooltip: 'Dashboard' },
+    { id: 'diagram', icon: React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+        React.createElement('ellipse', { cx: 12, cy: 5, rx: 9, ry: 3 }),
+        React.createElement('path', { d: 'M21 12c0 1.66-4 3-9 3s-9-1.34-9-3' }),
+        React.createElement('path', { d: 'M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5' })
+      ), tooltip: 'Diagram Generator' },
+  ];
+  return (
+    <nav className="w-12 shrink-0 bg-[#161b22] border-r border-[#21262d]/50 flex flex-col items-center justify-center gap-2">
+      {items.map(item => (
+        <button key={item.id} onClick={() => onNavigate(item.id)}
+          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${activeView === item.id ? 'bg-[#1f6feb]/20 text-[#58a6ff] border border-[#58a6ff]/30' : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]/80'}`}
+          title={item.tooltip}>
+          {item.icon}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function StatCard({ label, value, color }) {
+  return (
+    <div className="bg-[#161b22] rounded-xl border border-[#30363d]/50 p-5">
+      <p className="text-[11px] text-[#8b949e] font-medium mb-1" style={{ color }}>{label}</p>
+      <p className="text-2xl font-bold text-[#e6edf3]">{value}</p>
+    </div>
+  );
+}
+
+function Dashboard({ tables, categories, tableCategory, onNavigate }) {
+  const stats = React.useMemo(() => {
+    const totalTables = tables.length;
+    const totalColumns = tables.reduce((s, t) => s + t.columns.length, 0);
+    const totalRelations = tables.reduce((s, t) => s + (t.refs || []).length, 0);
+    const totalPKs = tables.reduce((s, t) => s + t.columns.filter(c => c.pk).length, 0);
+    const totalFKs = tables.reduce((s, t) => s + t.columns.filter(c => c.fk).length, 0);
+    return { totalTables, totalColumns, totalRelations, totalPKs, totalFKs };
+  }, [tables]);
+
+  const getCategory = (tableId) => {
+    const catId = tableCategory[tableId];
+    if (!catId) return null;
+    return categories.find(c => c.id === catId) || null;
+  };
+
+  return (
+    <div className="flex-1 p-6 overflow-auto bg-[#0d1117]">
+      <div className="max-w-5xl mx-auto">
+        <h2 className="text-xl font-bold text-[#e6edf3] mb-6">Dashboard General</h2>
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <StatCard label="Tablas" value={stats.totalTables} color="#58a6ff" />
+          <StatCard label="Columnas" value={stats.totalColumns} color="#3fb950" />
+          <StatCard label="Relaciones" value={stats.totalRelations} color="#d29922" />
+          <StatCard label="PKs / FKs" value={`${stats.totalPKs} / ${stats.totalFKs}`} color="#bc8cff" />
+        </div>
+        {tables.length > 0 ? (
+          <div className="bg-[#161b22] rounded-xl border border-[#30363d]/50 overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#30363d]/50">
+              <h3 className="text-sm font-semibold text-[#e6edf3]">Listado de Tablas</h3>
+            </div>
+            <div className="divide-y divide-[#30363d]/50">
+              {tables.map(t => {
+                const cat = getCategory(t.id);
+                return (
+                  <div key={t.id} className="px-5 py-3 flex items-center justify-between hover:bg-[#1c2128]/50">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-3 h-3 rounded shrink-0" style={{ backgroundColor: t.color || '#58a6ff' }} />
+                      <span className="text-[13px] font-medium text-[#c9d1d9] truncate">{t.name}</span>
+                      {cat && <span className="text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap" style={{ backgroundColor: cat.color + '20', color: cat.color }}>{cat.name}</span>}
+                    </div>
+                    <div className="flex items-center gap-4 text-[11px] text-[#8b949e] shrink-0">
+                      <span>{t.columns.length} cols.</span>
+                      <span>{t.columns.filter(c => c.pk).length} PK</span>
+                      <span>{t.columns.filter(c => c.fk).length} FK</span>
+                      <span>{(t.refs || []).length} rel.</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-20">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-[#21262d] flex items-center justify-center">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#8b949e]">
+                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+              </svg>
+            </div>
+            <p className="text-[#8b949e] text-sm">No hay tablas cargadas</p>
+            <p className="text-[#6e7681] text-[12px] mt-1">Carga un archivo SQL o escribe en el editor</p>
+            <button onClick={() => onNavigate('diagram')} className="mt-4 text-[12px] font-medium bg-[#1f6feb]/20 text-[#58a6ff] border border-[#58a6ff]/30 rounded-lg px-4 h-8 hover:bg-[#1f6feb]/30 transition-colors">
+              Ir al Diagrama
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
   </script>
   <script type="text/babel">
 function App() {
@@ -1398,6 +1505,7 @@ function App() {
   const [tableCategory, setTableCategory] = useState({});
   const [showCategories, setShowCategories] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
+  const [activeView, setActiveView] = useState('diagram');
   const [sortFitKey, setSortFitKey] = useState(0);
   const [showAddRel, setShowAddRel] = useState(false);
   const [addRelForm, setAddRelForm] = useState({ sourceId: '', targetId: '', cardinality: 'M:1' });
@@ -1810,8 +1918,13 @@ CREATE TABLE pedido_productos (
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-[#0d1117]">
-      <header className={`bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 ${tables.length > 0 ? 'border-b border-[#21262d]/50' : ''}`}>
+    <div className="h-screen flex bg-[#0d1117]">
+      <Sidebar activeView={activeView} onNavigate={setActiveView} />
+      {activeView === 'dashboard' ? (
+        <Dashboard tables={tables} categories={categories} tableCategory={tableCategory} onNavigate={setActiveView} />
+      ) : (
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className={`bg-[#161b22]/80 px-5 py-3 flex items-center justify-between shrink-0 ${tables.length > 0 ? 'border-b border-[#21262d]/50' : ''}`}>
         <div className="flex items-center gap-3">
           <div className="bg-[#1f6feb]/20 rounded-lg p-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[#58a6ff]">
@@ -2054,6 +2167,8 @@ CREATE TABLE pedido_productos (
           )}
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
