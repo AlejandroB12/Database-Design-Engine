@@ -1724,7 +1724,7 @@ function Dashboard({ tables, categories, tableCategory, onNavigate, onLoadSql, c
   return (
     <div className="flex-1 p-6 overflow-auto relative dashboard-bg">
       <div className="dashboard-bg-overlay" />
-      <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm pointer-events-none" />
       <div className="dashboard-orb w-[500px] h-[500px] bg-[#58a6ff]/10 top-[-150px] right-[-100px]" style={{ animation: 'float-orb 18s ease-in-out infinite' }} />
       <div className="dashboard-orb w-[400px] h-[400px] bg-[#bc8cff]/10 bottom-[-100px] left-[-80px]" style={{ animation: 'float-orb2 22s ease-in-out infinite' }} />
       <div className="dashboard-orb w-[350px] h-[350px] bg-[#3fb950]/8 top-[40%] left-[60%]" style={{ animation: 'float-orb3 20s ease-in-out infinite' }} />
