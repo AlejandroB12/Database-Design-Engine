@@ -10,7 +10,7 @@ class StatusPago(str, enum.Enum):
     COMPLETADO = "completado"
     CANCELADO = "cancelado"
 
-class payment_history(Base):
+class Payment_History(Base):
     
     __tablename__ = 'payment_history'
 
