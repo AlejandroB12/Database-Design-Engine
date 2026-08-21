@@ -1,13 +1,13 @@
 from sqlalchemy import Column, Integer, String, DateTime, func
-from sqlalchemy.orm import declarative_base
 
-Base = declarative_base()
+from models.base import Base
+
 
 class Client(Base):
     
     __tablename__ = 'client'
 
-    id_cliente = Column(Integer, primary_key=True, autoincrement=True)
+    id_client = Column(Integer, primary_key=True, autoincrement=True)
     first_name = Column(String(16), nullable=False)
     last_name = Column(String(16), nullable=False)
     user_name = Column(String(20), nullable=False, unique=True)

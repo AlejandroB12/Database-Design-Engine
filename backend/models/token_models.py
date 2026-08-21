@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, DateTime, Text, func,ForeignKey
-from sqlalchemy.orm import declarative.base, relationship
+from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+from models.base import Base
 
 class Token(Base):
     
@@ -11,5 +11,5 @@ class Token(Base):
     refresh_token = Column(Text, unique=True, nullable=False)
     created_in = Column(DateTime, server_default=func.now())
     expires_in = Column(DateTime, nullable=False)
-    id_cliente = Column(Integer,ForeignKey('client.id_client', name='fk_token_cliente', ondelete='cascade'), nullable=False)
+    id_client = Column(Integer,ForeignKey('client.id_client', name='fk_token_cliente', ondelete='cascade'), nullable=False)
 

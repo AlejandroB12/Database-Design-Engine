@@ -1,7 +1,9 @@
-from sqlalchemy import Column, Numeric, String, DateTime, func, ForeignKey
-from sqlalchemy.orm import declarative_base, relationship
+import enum
 
-Base = declarative_base()
+from sqlalchemy import Column, Enum, Integer, Numeric, String, DateTime, func, ForeignKey
+from sqlalchemy.orm import relationship
+
+from models.base import Base
 
 
 class StatusPago(str, enum.Enum):

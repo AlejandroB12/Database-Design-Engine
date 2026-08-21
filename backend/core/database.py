@@ -1,17 +1,20 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from config import settings 
+from collections.abc import AsyncGenerator
 
-# 1. Creamos el motor de conexión apuntando a tu PostgreSQL local
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-# 2. Configuramos la fábrica de sesiones
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from core.config import settings
 
-# 3. Mantenemos el generador de dependencias para usarlo en tus rutas (endpoints)
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as session:
+        yield session
