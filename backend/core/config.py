@@ -1,32 +1,19 @@
-from functools import lru_cache
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
+from pathlib import Path
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    # Cambiamos el nombre para reflejar que ahora es una BD genérica/local
+    database_url: str
+    
+    app_host: str = "0.0.0.0"
+    app_port: int = 8000
+    app_debug: bool = True
 
-    APP_NAME: str = "Database Modeler"
-    APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    model_config = {
+        # Asegúrate de que esta ruta apunte correctamente a donde crearás tu archivo .env
+        "env_file": ".env", 
+        "env_file_encoding": "utf-8",
+        "extra": "ignore",
+    }
 
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/database_modeler"
-
-    SECRET_KEY: str = "change-me-in-production"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:8000"]
-
-
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings = get_settings()
+settings = Settings()
