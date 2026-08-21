@@ -64,6 +64,7 @@
 
     const firstName = registerForm.querySelector('#reg-name').value.trim()
     const lastName = registerForm.querySelector('#reg-lastname').value.trim()
+    const userName = registerForm.querySelector('#reg-username').value.trim()
     const email = registerForm.querySelector('#reg-email').value.trim()
     const password = registerForm.querySelector('#reg-password').value
     const confirm = registerForm.querySelector('#reg-confirm').value
@@ -71,6 +72,7 @@
     const button = registerForm.querySelector('.btn-signin')
 
     if (!firstName || !lastName) return showError(registerForm, 'Completa tu nombre y apellido')
+    if (userName && userName.length < 3) return showError(registerForm, 'El nombre de usuario debe tener al menos 3 caracteres')
     if (!isValidEmail(email)) return showError(registerForm, 'Ingresa un correo válido')
     if (password.length < 8) return showError(registerForm, 'La contraseña debe tener al menos 8 caracteres')
     if (password !== confirm) return showError(registerForm, 'Las contraseñas no coinciden')
@@ -81,6 +83,7 @@
       await ApiClient.post('/auth/register', {
         first_name: firstName,
         last_name: lastName,
+        user_name: userName || null,
         email,
         password,
       })
