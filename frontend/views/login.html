@@ -899,6 +899,13 @@ a { text-decoration: none; color: inherit; }
   color: var(--accent-1);
   text-decoration: underline;
 }
+
+.form-error {
+  color: #ff7b72;
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0.25rem 0 0.75rem;
+}
 </style>
 </head>
 <body>
@@ -1031,6 +1038,7 @@ a { text-decoration: none; color: inherit; }
         <label for="remember">Recuérdame</label>
       </div>
 
+      <p class="form-error" hidden></p>
       <button type="submit" class="btn-signin">Iniciar sesión</button>
     </form>
 
@@ -1086,6 +1094,7 @@ a { text-decoration: none; color: inherit; }
         <input type="checkbox" id="reg-terms">
         <label for="reg-terms">Acepto los <a href="#">Términos y condiciones</a></label>
       </div>
+      <p class="form-error" hidden></p>
       <button type="submit" class="btn-signin">Crear cuenta</button>
       <div class="signup-link" style="margin-top:1.5rem">
         <p><a href="#" class="toggle-form-link">Volver a inicio de sesión</a></p>
@@ -1184,6 +1193,8 @@ a { text-decoration: none; color: inherit; }
   })
 })()
 </script>
+<script src="/controller/http_client.js"></script>
+<script src="/controller/auth_controller.js"></script>
 
 </body>
 </html>

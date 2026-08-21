@@ -1,34 +1,17 @@
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent / "backend"))
+
 import uvicorn
+from fastapi import FastAPI
+
+from api import api_router
+from core.statics import mount_statics
 
 app = FastAPI(title="Database Modeler")
-
-app.mount("/lib", StaticFiles(directory="frontend/lib"), name="lib")
-app.mount("/routes", StaticFiles(directory="frontend/routes"), name="routes")
-app.mount("/assets", StaticFiles(directory="assets"), name="assets")
-app.mount("/images", StaticFiles(directory="assets/images"), name="images")
-
-@app.get("/generador")
-async def index():
-    return FileResponse("frontend/views/diagram-generator", media_type="text/html")
-
-@app.get("/demo")
-async def demo():
-    return FileResponse("frontend/views/demo-generator", media_type="text/html")
-
-@app.get("/")
-async def landing():
-    return FileResponse("frontend/views/index.html", media_type="text/html")
-
-@app.get("/login")
-async def login():
-    return FileResponse("frontend/views/login.html", media_type="text/html")
-
-@app.get("/register")
-async def register():
-    return FileResponse("frontend/views/login.html", media_type="text/html")
+app.include_router(api_router)
+mount_statics(app)
 
 
 if __name__ == "__main__":
