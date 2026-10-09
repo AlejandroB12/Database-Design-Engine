@@ -1,7 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import FileResponse
-
-from auth.page_guard import require_session
 
 router = APIRouter()
 
@@ -21,7 +19,7 @@ async def register():
     return FileResponse("frontend/views/login.html", media_type="text/html")
 
 
-@router.get("/generador", dependencies=[Depends(require_session)])
+@router.get("/generador")
 async def index():
     return FileResponse("frontend/views/diagram-generator", media_type="text/html")
 
